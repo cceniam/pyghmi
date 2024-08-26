@@ -851,7 +851,7 @@ class Command(object):
 
     def get_extended_bmc_configuration(self, hideadvanced=True):
         self.oem_init()
-        return self._oem.get_extended_bmc_configuration(hideadvanced=True)
+        return self._oem.get_extended_bmc_configuration(hideadvanced=hideadvanced)
 
     def get_bmc_configuration(self):
         self.oem_init()
