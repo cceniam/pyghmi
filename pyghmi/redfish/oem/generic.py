@@ -533,6 +533,12 @@ class OEMHandler(object):
                 'Model': self._varsysinfo.get(
                     'SKU', self._varsysinfo.get('PartNumber', '')),
             }
+            if sysinfo['UUID'] and '-' not in sysinfo['UUID']:
+                sysinfo['UUID'] = '-'.join((
+                    sysinfo['UUID'][:8], sysinfo['UUID'][8:12],
+                    sysinfo['UUID'][12:16], sysinfo['UUID'][16:20],
+                    sysinfo['UUID'][20:]))
+            sysinfo['UUID'] = sysinfo['UUID'].lower()
             return sysinfo
         else:
             for invpair in self.get_inventory():
@@ -548,6 +554,12 @@ class OEMHandler(object):
             'Model': self._varsysinfo.get(
                 'SKU', self._varsysinfo.get('PartNumber', '')),
         }
+        if sysinfo['UUID'] and '-' not in sysinfo['UUID']:
+            sysinfo['UUID'] = '-'.join((
+                sysinfo['UUID'][:8], sysinfo['UUID'][8:12],
+                sysinfo['UUID'][12:16], sysinfo['UUID'][16:20],
+                sysinfo['UUID'][20:]))
+        sysinfo['UUID'] = sysinfo['UUID'].lower()
         yield ('System', sysinfo)
         self._hwnamemap = {}
         cpumemurls = []
