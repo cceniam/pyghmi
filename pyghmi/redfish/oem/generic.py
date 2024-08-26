@@ -43,6 +43,11 @@ class SensorReading(object):
         self.units = units
         self.unavailable = unavailable
 
+def _normalize_mac(mac):
+    if ':' not in mac:
+        mac = ':'.join((mac[:2], mac[2:4], mac[4:6], mac[6:8], mac[8:10], mac[10:12]))
+    return mac.lower()
+
 _healthmap = {
     'Critical': const.Health.Critical,
     'Unknown': const.Health.Warning,
@@ -611,22 +616,39 @@ class OEMHandler(object):
             yield (dname, ddata)
 
     def _get_adp_inventory(self, onlyname=False, withids=False, urls=None):
+        foundmacs = False
+        macinfobyadpname = {}
+        if 'NetworkInterfaces' in self._varsysinfo:
+            nifurls = self._do_web_request(self._varsysinfo['NetworkInterfaces']['@odata.id'])
+            nifurls = nifurls.get('Members', [])
+            nifurls = [x['@odata.id'] for x in nifurls]
+            for nifurl in nifurls:
+                nifinfo = self._do_web_request(nifurl)
+
+                nadurl = nifinfo.get('Links', {}).get('NetworkAdapter', {}).get("@odata.id")
+                if nadurl:
+                    nadinfo = self._do_web_request(nadurl)
+                    if 'Name' not in nadinfo:
+                        continue
+                    nicname = nadinfo['Name']
+                    yieldinf = {}
+                    macidx = 1
+                    for ctrlr in nadinfo.get('Controllers', []):
+                        porturls = [x['@odata.id'] for x in ctrlr.get(
+                            'Links', {}).get('Ports', [])]
+                        for porturl in porturls:
+                            portinfo = self._do_web_request(porturl)
+                            macs = [x for x in portinfo.get(
+                                'Ethernet', {}).get(
+                                    'AssociatedMACAddresses', [])]
+                            for mac in macs:
+                                label = 'MAC Address {}'.format(macidx)
+                                yieldinf[label] = _normalize_mac(mac)
+                                macidx += 1
+                                foundmacs = True
+                    macinfobyadpname[nicname] = yieldinf
         if not urls:
             urls = self._get_adp_urls()
-            if not urls:
-                # No PCIe device inventory, but *maybe* ethernet inventory...
-                aidx = 1
-                for nicinfo in self._get_eth_urls():
-                    nicinfo = self._do_web_request(nicinfo)
-                    nicname = nicinfo.get('Name', None)
-                    nicinfo = nicinfo.get('MACAddress', None)
-                    if not nicname:
-                        nicname = 'NIC'
-                    if nicinfo:
-                        yield (nicname,
-                               {'MAC Address {0}'.format(aidx): nicinfo})
-                        aidx += 1
-                return
         for inf in self._do_bulk_requests(urls):
             adpinfo, url = inf
             aname = adpinfo.get('Name', 'Unknown')
@@ -648,6 +670,8 @@ class OEMHandler(object):
                 yieldinf = {'Id': adpinfo.get('Id', aname)}
             else:
                 yieldinf = {}
+            if aname in macinfobyadpname:
+                yieldinf.update(macinfobyadpname[aname])
             funurls = [x['@odata.id'] for x in functions]
             for fun in self._do_bulk_requests(funurls):
                 funinfo, url = fun
@@ -660,14 +684,42 @@ class OEMHandler(object):
                 yieldinf['PCI Subsystem Vendor ID'] = funinfo[
                     'SubsystemVendorId'].replace('0x', '')
                 yieldinf['Type'] = funinfo['DeviceClass']
-                for nicinfo in funinfo.get('Links', {}).get(
-                        'EthernetInterfaces', []):
-                    nicinfo = self._do_web_request(nicinfo['@odata.id'])
-                    macaddr = nicinfo.get('MACAddress', None)
-                    if macaddr:
-                        yieldinf['MAC Address {0}'.format(nicidx)] = macaddr
-                        nicidx += 1
+                if aname not in macinfobyadpname:
+                    for nicinfo in funinfo.get('Links', {}).get(
+                            'EthernetInterfaces', []):
+                        nicinfo = self._do_web_request(nicinfo['@odata.id'])
+                        macaddr = nicinfo.get('MACAddress', None)
+                        if macaddr:
+                            macaddr = _normalize_mac(macaddr)
+                            foundmacs = True
+                            yieldinf['MAC Address {0}'.format(nicidx)] = macaddr
+                            nicidx += 1
+            if aname in macinfobyadpname:
+                del macinfobyadpname[aname]
             yield aname, yieldinf
+        if macinfobyadpname:
+            for adp in macinfobyadpname:
+                yield adp, macinfobyadpname[adp]
+        if not foundmacs:
+          # No PCIe device inventory, but *maybe* ethernet inventory...
+            idxsbyname = {}
+            for nicinfo in self._get_eth_urls():
+                nicinfo = self._do_web_request(nicinfo)
+                nicname = nicinfo.get('Name', None)
+                nicinfo = nicinfo.get('MACAddress', nicinfo.get('PermanentAddress', None))
+                if nicinfo and ':' not in nicinfo:
+                    nicinfo = ':'.join((
+                        nicinfo[:2], nicinfo[2:4], nicinfo[4:6], nicinfo[6:8],
+                        nicinfo[8:10], nicinfo[10:12]))
+                if not nicname:
+                    nicname = 'NIC'
+                if nicinfo:
+                    if nicname not in idxsbyname:
+                        idxsbyname[nicname] = 0
+                    idxsbyname[nicname] += 1
+                    nicinfo = nicinfo.lower()
+                    yield (nicname,
+                            {'MAC Address {}'.format(idxsbyname[nicname]): nicinfo})
 
     def _get_eth_urls(self):
         ethurls = self._varsysinfo.get('EthernetInterfaces', {})
