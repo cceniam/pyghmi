@@ -823,8 +823,16 @@ class Command(object):
         In many cases, this may render remote network access impracticle or
         impossible."
         """
+        bmcinfo = self._do_web_request(self._bmcurl)
+        rc = bmcinfo.get('Actions', {}).get('#Manager.ResetToDefaults', {})
+        actinf = rc.get('ResetType@Redfish.AllowableValues', [])
+        if 'ResetAll' in actinf:
+            acturl = actinf.get('target', None)
+            if acturl:
+                self._do_web_request(acturl, {'ResetType': 'ResetAll'})
+                return
         raise exc.UnsupportedFunctionality(
-            'Clear BMC configuration not supported in redfish yet')
+            'Clear BMC configuration not supported on this platform')
 
     def get_system_configuration(self, hideadvanced=True):
         return self.oem.get_system_configuration(hideadvanced, self)
