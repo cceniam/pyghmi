@@ -849,9 +849,9 @@ class Command(object):
         else:
             raise Exception("Unrecognized data format " + repr(fetchdata))
 
-    def get_extended_bmc_configuration(self):
+    def get_extended_bmc_configuration(self, hideadvanced=True):
         self.oem_init()
-        return self._oem.get_extended_bmc_configuration()
+        return self._oem.get_extended_bmc_configuration(hideadvanced=True)
 
     def get_bmc_configuration(self):
         self.oem_init()

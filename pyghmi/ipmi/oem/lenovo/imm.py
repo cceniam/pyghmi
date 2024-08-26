@@ -978,8 +978,8 @@ class XCCClient(IMMClient):
                 return {}
         return {'height': int(dsc['u-height']), 'slot': int(dsc['slot'])}
 
-    def get_extended_bmc_configuration(self):
-        immsettings = self.get_system_configuration(fetchimm=True)
+    def get_extended_bmc_configuration(self, hideadvanced=True):
+        immsettings = self.get_system_configuration(fetchimm=True, hideadvanced=hideadvanced)
         for setting in list(immsettings):
             if not setting.startswith('IMM.'):
                 del immsettings[setting]

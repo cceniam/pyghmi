@@ -1194,9 +1194,9 @@ class OEMHandler(generic.OEMHandler):
             return {'height': self._fpc_variant & 0xf, 'slot': 0}
         return super(OEMHandler, self).get_description()
 
-    def get_extended_bmc_configuration(self):
+    def get_extended_bmc_configuration(self, hideadvanced=True):
         if self.has_xcc:
-            return self.immhandler.get_extended_bmc_configuration()
+            return self.immhandler.get_extended_bmc_configuration(hideadvanced=hideadvanced)
         return super(OEMHandler, self).get_extended_bmc_configuration()
 
     def get_bmc_configuration(self):
