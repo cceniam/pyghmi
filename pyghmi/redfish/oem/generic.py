@@ -780,20 +780,24 @@ class OEMHandler(object):
 
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         usd = self._do_web_request('/redfish/v1/UpdateService')
-        if usd.get('HttpPushUriTargetsBusy', False):
-            raise exc.TemporaryError('Cannot run multtiple updates to '
-                                        'same target concurrently')
-        try:
-            upurl = usd['HttpPushUri']
-        except KeyError:
-            raise exc.UnsupportedFunctionality('Redfish firmware update only supported for implementations with push update support')
-        if 'HttpPushUriTargetsBusy' in usd:
-            self._do_web_request(
-                '/redfish/v1/UpdateService',
-                {'HttpPushUriTargetsBusy': True}, method='PATCH')
+        upurl = usd.get('MultipartHttpPushUri', None)
+        ismultipart = True
+        if not upurl:
+            ismultipart = False
+            if usd.get('HttpPushUriTargetsBusy', False):
+                raise exc.TemporaryError('Cannot run multtiple updates to '
+                                            'same target concurrently')
+            try:
+                upurl = usd['HttpPushUri']
+            except KeyError:
+                raise exc.UnsupportedFunctionality('Redfish firmware update only supported for implementations with push update support')
+            if 'HttpPushUriTargetsBusy' in usd:
+                self._do_web_request(
+                    '/redfish/v1/UpdateService',
+                    {'HttpPushUriTargetsBusy': True}, method='PATCH')
         try:
             uploadthread = webclient.FileUploader(
-                self.webclient, upurl, filename, data, formwrap=False,
+                self.webclient, upurl, filename, data, formwrap=ismultipart,
                 excepterror=False)
             uploadthread.start()
             wc = self.webclient
@@ -823,6 +827,7 @@ class OEMHandler(object):
             # sometimes we get an empty pgress when transitioning from the apply phase to
             # the validating phase; add a retry here so we don't exit the loop in this case
             retry = 3
+            pct = 0.0
             while not complete and retry > 0:
                 pgress = self._do_web_request(monitorurl, cache=False)
                 if not pgress:
@@ -837,7 +842,10 @@ class OEMHandler(object):
                              'Suspended'):
                     raise Exception(
                         json.dumps(json.dumps(pgress['Messages'])))
-                pct = float(pgress['PercentComplete'])
+                if 'PercentComplete' in pgress:
+                    pct = float(pgress['PercentComplete'])
+                else:
+                    print(repr(pgress))
                 complete = state == 'Completed'
                 progress({'phase': phase, 'progress': pct})
                 if complete:
