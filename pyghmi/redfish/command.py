@@ -1421,20 +1421,20 @@ class Command(object):
         return self.oem.get_diagnostic_data(savefile, progress, autosuffix)
 
     def get_licenses(self):
-        return self.oem.get_licenses()
+        return self.oem.get_licenses(self)
 
     def delete_license(self, name):
-        return self.oem.delete_license(name)
+        return self.oem.delete_license(name, self)
 
     def save_licenses(self, directory):
         if os.path.exists(directory) and not os.path.isdir(directory):
             raise exc.InvalidParameterValue(
                 'Not allowed to overwrite existing file: {0}'.format(
                     directory))
-        return self.oem.save_licenses(directory)
+        return self.oem.save_licenses(directory, self)
 
     def apply_license(self, filename, progress=None, data=None):
-        return self.oem.apply_license(filename, progress, data)
+        return self.oem.apply_license(filename, self, progress, data)
 
 
 if __name__ == '__main__':

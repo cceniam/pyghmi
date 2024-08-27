@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 from fnmatch import fnmatch
 import json
 import os
@@ -982,17 +983,59 @@ class OEMHandler(object):
         raise exc.UnsupportedFunctionality(
             'Retrieving diagnostic data is not implemented for this platform')
 
-    def get_licenses(self):
-        raise exc.UnsupportedFunctionality()
+    def _get_license_collection_url(self, fishclient):
+        overview = fishclient._do_web_request('/redfish/v1/')
+        licsrv = overview.get('LicenseService', {}).get('@odata.id', None)
+        if not licsrv:
+            raise exc.UnsupportedFunctionality()
+        lcs = fishclient._do_web_request(licsrv)
+        licenses = lcs.get('Licenses', {}).get('@odata.id',None)
+        if not licenses:
+            raise exc.UnsupportedFunctionality()
+        return licenses
 
-    def delete_license(self, name):
-        raise exc.UnsupportedFunctionality()
+    def _get_licenses(self, fishclient):
+        licenses = self._get_license_collection_url(fishclient)
+        collection = fishclient._do_web_request(licenses)
+        alllic = [x['@odata.id'] for x in collection.get('Members', [])]
+        for license in alllic:
+            licdet = fishclient._do_web_request(license)
+            state = licdet.get('Status', {}).get('State')
+            if state != 'Enabled':
+                continue
+            yield licdet
 
-    def save_licenses(self, directory):
-        raise exc.UnsupportedFunctionality()
+    def get_licenses(self, fishclient):
+        for licdet in self._get_licenses(fishclient):
+            name = licdet['Name']
+            yield {'name': name, 'state': 'Active'}
 
-    def apply_license(self, filename, progress=None, data=None):
-        raise exc.UnsupportedFunctionality()
+    def delete_license(self, name, fishclient):
+        for licdet in self._get_licenses(fishclient):
+            lname = licdet['Name']
+            if name == lname:
+                fishclient._do_web_request(licdet['@odata.id'], method='DELETE')
+
+    def save_licenses(self, directory, fishclient):
+        for licdet in self._get_licenses(fishclient):
+            dload = licdet.get('DownloadURI', None)
+            if dload:
+                filename = os.path.basename(dload)
+                savefile = os.path.join(directory, filename)
+                fd = webclient.FileDownloader(fishclient.wc, dload, savefile)
+                fd.start()
+                while fd.isAlive():
+                    fd.join(1)
+                yield savefile
+
+    def apply_license(self, filename, fishclient, progress=None, data=None):
+        licenses = self._get_license_collection_url(fishclient)
+        if data is None:
+            data = open(filename, 'rb')
+        licdata = data.read()
+        lic64 = base64.b64encode(licdata).decode()
+        licinfo = {"LicenseString": lic64}
+        fishclient._do_web_request(licenses, licinfo)
 
     def get_user_expiration(self, uid):
         return None
