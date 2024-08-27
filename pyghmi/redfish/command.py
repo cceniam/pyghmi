@@ -789,6 +789,9 @@ class Command(object):
     def get_health(self, verbose=True):
         return self.oem.get_health(self, verbose)
 
+    def get_extended_bmc_configuration(self, hideadvanced=True):
+        return self.oem.get_extended_bmc_configuration(self, hideadvanced=hideadvanced)
+
     def get_bmc_configuration(self):
         """Get miscellaneous BMC configuration
 

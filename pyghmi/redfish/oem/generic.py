@@ -994,6 +994,9 @@ class OEMHandler(object):
             raise exc.UnsupportedFunctionality()
         return licenses
 
+    def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
+        raise exc.UnsupportedFunctionality()
+
     def _get_licenses(self, fishclient):
         licenses = self._get_license_collection_url(fishclient)
         collection = fishclient._do_web_request(licenses)

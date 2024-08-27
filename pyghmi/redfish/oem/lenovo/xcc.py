@@ -149,6 +149,13 @@ class OEMHandler(generic.OEMHandler):
         self.fwc = None
         self.fwo = None
 
+    def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
+        immsettings = self.get_system_configuration(fetchimm=True, hideadvanced=hideadvanced)
+        for setting in list(immsettings):
+            if not setting.startswith('IMM.'):
+                del immsettings[setting]
+        return immsettings
+
     def get_system_configuration(self, hideadvanced=True, fishclient=None,
                                  fetchimm=False):
         if not self.fwc:
