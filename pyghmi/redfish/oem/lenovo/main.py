@@ -15,6 +15,7 @@
 import pyghmi.redfish.oem.generic as generic
 from pyghmi.redfish.oem.lenovo import tsma
 from pyghmi.redfish.oem.lenovo import xcc
+from pyghmi.redfish.oem.lenovo import xcc3
 
 
 def get_handler(sysinfo, sysurl, webclient, cache, cmd):
@@ -26,6 +27,9 @@ def get_handler(sysinfo, sysurl, webclient, cache, cmd):
     if 'FrontPanelUSB' in leninf or 'USBManagementPortAssignment' in leninf or sysinfo.get('SKU', '').startswith('7X58'):
         return xcc.OEMHandler(sysinfo, sysurl, webclient, cache,
                               gpool=cmd._gpool)
+    elif 'NextOneTimeBootDevice' in leninf:
+        return xcc3.OEMHandler(sysinfo, sysurl, webclient, cache,
+                               gpool=cmd._gpool)
     else:
         leninv = sysinfo.get('Links', {}).get('OEM', {}).get(
             'Lenovo', {}).get('Inventory', {})

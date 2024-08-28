@@ -44,10 +44,28 @@ class SensorReading(object):
         self.units = units
         self.unavailable = unavailable
 
+
+def _to_boolean(attrval):
+    attrval = attrval.lower()
+    if not attrval:
+        return False
+    if ('true'.startswith(attrval) or 'yes'.startswith(attrval)
+            or 'enabled'.startswith(attrval) or attrval == '1'):
+        return True
+    if ('false'.startswith(attrval) or 'no'.startswith(attrval)
+            or 'disabled'.startswith(attrval) or attrval == '0'):
+        return False
+    raise Exception(
+        'Unrecognized candidate for boolean: {0}'.format(attrval))
+
+
 def _normalize_mac(mac):
     if ':' not in mac:
-        mac = ':'.join((mac[:2], mac[2:4], mac[4:6], mac[6:8], mac[8:10], mac[10:12]))
+        mac = ':'.join((
+            mac[:2], mac[2:4], mac[4:6],
+            mac[6:8], mac[8:10], mac[10:12]))
     return mac.lower()
+
 
 _healthmap = {
     'Critical': const.Health.Critical,
@@ -345,6 +363,38 @@ class OEMHandler(object):
     def get_system_configuration(self, hideadvanced=True, fishclient=None):
         return self._getsyscfg(fishclient)[0]
 
+    def _get_attrib_registry(self, fishclient, attribreg):
+        overview = fishclient._do_web_request('/redfish/v1/')
+        reglist = overview['Registries']['@odata.id']
+        reglist = fishclient._do_web_request(reglist)
+        regurl = None
+        for cand in reglist.get('Members', []):
+            cand = cand.get('@odata.id', '')
+            candname = cand.split('/')[-1]
+            if candname == '':  # implementation uses trailing slash
+                candname = cand.split('/')[-2]
+            if candname == attribreg:
+                regurl = cand
+                break
+        if not regurl:
+            # Workaround a vendor bug where they link to a
+            # non-existant name
+            for cand in reglist.get('Members', []):
+                cand = cand.get('@odata.id', '')
+                candname = cand.split('/')[-1]
+                candname = candname.split('.')[0]
+                if candname == attribreg.split('.')[0]:
+                    regurl = cand
+                    break
+        if regurl:
+            reginfo = fishclient._do_web_request(regurl)
+            for reg in reginfo.get('Location', []):
+                if reg.get('Language', 'en').startswith('en'):
+                    reguri = reg['Uri']
+                    reginfo = self._get_biosreg(reguri, fishclient)
+                    return reginfo
+                    extrainfo, valtodisplay, _, self.attrdeps = reginfo
+
     def _getsyscfg(self, fishclient):
         biosinfo = self._do_web_request(fishclient._biosurl, cache=False)
         reginfo = ({}, {}, {}, {})
@@ -352,36 +402,9 @@ class OEMHandler(object):
         valtodisplay = {}
         self.attrdeps = {'Dependencies': [], 'Attributes': []}
         if 'AttributeRegistry' in biosinfo:
-            overview = fishclient._do_web_request('/redfish/v1/')
-            reglist = overview['Registries']['@odata.id']
-            reglist = fishclient._do_web_request(reglist)
-            regurl = None
-            for cand in reglist.get('Members', []):
-                cand = cand.get('@odata.id', '')
-                candname = cand.split('/')[-1]
-                if candname == '':  # implementation uses trailing slash
-                    candname = cand.split('/')[-2]
-                if candname == biosinfo['AttributeRegistry']:
-                    regurl = cand
-                    break
-            if not regurl:
-                # Workaround a vendor bug where they link to a
-                # non-existant name
-                for cand in reglist.get('Members', []):
-                    cand = cand.get('@odata.id', '')
-                    candname = cand.split('/')[-1]
-                    candname = candname.split('.')[0]
-                    if candname == biosinfo[
-                            'AttributeRegistry'].split('.')[0]:
-                        regurl = cand
-                        break
-            if regurl:
-                reginfo = fishclient._do_web_request(regurl)
-                for reg in reginfo.get('Location', []):
-                    if reg.get('Language', 'en').startswith('en'):
-                        reguri = reg['Uri']
-                        reginfo = self._get_biosreg(reguri, fishclient)
-                        extrainfo, valtodisplay, _, self.attrdeps = reginfo
+            reginfo = self._get_attrib_registry(fishclient, biosinfo['AttributeRegistry'])
+            if reginfo:
+                extrainfo, valtodisplay, _, self.attrdeps = reginfo
         currsettings = {}
         try:
             pendingsettings = fishclient._do_web_request(
@@ -418,10 +441,19 @@ class OEMHandler(object):
         rawsettings = fishclient._do_web_request(fishclient._biosurl,
                                                  cache=False)
         rawsettings = rawsettings.get('Attributes', {})
-        pendingsettings = fishclient._do_web_request(fishclient._setbiosurl)
+        pendingsettings = fishclient._do_web_request(
+            fishclient._setbiosurl)
+        return self._set_redfish_settings(
+            changeset, fishclient, currsettings, rawsettings,
+            pendingsettings, self.attrdeps, reginfo,
+            fishclient._setbiosurl)
+
+    def _set_redfish_settings(self, changeset, fishclient, currsettings,
+                              rawsettings, pendingsettings, attrdeps, reginfo,
+                              seturl):
         etag = pendingsettings.get('@odata.etag', None)
         pendingsettings = pendingsettings.get('Attributes', {})
-        dephandler = AttrDependencyHandler(self.attrdeps, rawsettings,
+        dephandler = AttrDependencyHandler(attrdeps, rawsettings,
                                            pendingsettings)
         for change in list(changeset):
             if change not in currsettings:
@@ -440,7 +472,7 @@ class OEMHandler(object):
             changeval = changeset[change]
             overrides, blameattrs = dephandler.get_overrides(change)
             meta = {}
-            for attr in self.attrdeps['Attributes']:
+            for attr in attrdeps['Attributes']:
                 if attr['AttributeName'] == change:
                     meta = dict(attr)
                     break
@@ -479,7 +511,7 @@ class OEMHandler(object):
                         changeset[change] = _to_boolean(changeset[change])
         redfishsettings = {'Attributes': changeset}
         fishclient._do_web_request(
-            fishclient._setbiosurl, redfishsettings, 'PATCH', etag=etag)
+            seturl, redfishsettings, 'PATCH', etag=etag)
 
     def attach_remote_media(self, url, username, password, vmurls):
         return None

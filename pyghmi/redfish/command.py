@@ -81,20 +81,6 @@ def _mask_to_cidr(mask):
     return cidr
 
 
-def _to_boolean(attrval):
-    attrval = attrval.lower()
-    if not attrval:
-        return False
-    if ('true'.startswith(attrval) or 'yes'.startswith(attrval)
-            or 'enabled'.startswith(attrval) or attrval == '1'):
-        return True
-    if ('false'.startswith(attrval) or 'no'.startswith(attrval)
-            or 'disabled'.startswith(attrval) or attrval == '0'):
-        return False
-    raise Exception(
-        'Unrecognized candidate for boolean: {0}'.format(attrval))
-
-
 def _cidr_to_mask(cidr):
     return socket.inet_ntop(
         socket.AF_INET, struct.pack(
