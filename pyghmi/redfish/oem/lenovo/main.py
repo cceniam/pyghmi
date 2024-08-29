@@ -24,12 +24,12 @@ def get_handler(sysinfo, sysurl, webclient, cache, cmd):
         bmcinfo = cmd.bmcinfo
         if 'Ami' in bmcinfo.get('Oem', {}):
             return tsma.TsmHandler(sysinfo, sysurl, webclient, cache)
-    if 'FrontPanelUSB' in leninf or 'USBManagementPortAssignment' in leninf or sysinfo.get('SKU', '').startswith('7X58'):
-        return xcc.OEMHandler(sysinfo, sysurl, webclient, cache,
-                              gpool=cmd._gpool)
     elif 'NextOneTimeBootDevice' in leninf:
         return xcc3.OEMHandler(sysinfo, sysurl, webclient, cache,
                                gpool=cmd._gpool)
+    elif 'FrontPanelUSB' in leninf or 'USBManagementPortAssignment' in leninf or sysinfo.get('SKU', '').startswith('7X58'):
+        return xcc.OEMHandler(sysinfo, sysurl, webclient, cache,
+                              gpool=cmd._gpool)
     else:
         leninv = sysinfo.get('Links', {}).get('OEM', {}).get(
             'Lenovo', {}).get('Inventory', {})
