@@ -1,4 +1,6 @@
 import pyghmi.redfish.oem.generic as generic
+import pyghmi.exceptions as pygexc
+
 
 class OEMHandler(generic.OEMHandler):
 
@@ -90,5 +92,40 @@ class OEMHandler(generic.OEMHandler):
             val.update(**extrainfo.get(setting, {}))
             currsettings[setting] = val
         return currsettings, reginfo
+
+    def get_firmware_inventory(self, components, fishclient):
+        fwlist = fishclient._do_web_request(fishclient._fwinventory)
+        rawfwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
+        fwurls = []
+        for fwurl in rawfwurls:
+            if fwurl.startswith('/redfish/v1/UpdateService/FirmwareInventory/Bundle.'):
+                continue  # skip Bundle information for now
+            fwurls.append(fwurl)
+        self._fwnamemap = {}
+        for res in fishclient._do_bulk_requests(fwurls):
+            redres = res[0]
+            if redres.get('Name', '').startswith('Firmware:'):
+                redres['Name'] = redres['Name'].replace('Firmware:', '')
+            if redres['Name'].startswith('Firmware-PSoC') and 'Drive_Backplane' in redres["@odata.id"]:
+                redres['Name'] = 'Drive Backplane'
+            if redres['Name'].startswith('DEVICE-'):
+                redres['Name'] = redres['Name'].replace('DEVICE-', '')
+            if redres['Name'].startswith('POWER-PSU'):
+                redres['Name'] = redres['Name'].replace('POWER-', '')
+            swid = redres.get('SoftwareId', '')
+            buildid = ''
+            version = redres.get('Version', None)
+            if swid.startswith('FPGA-') or swid.startswith('UEFI-') or swid.startswith('BMC-'):
+                buildid = swid.split('-')[1] + version.split('-')[0]
+                version = '-'.join(version.split('-')[1:])
+            if version:
+                redres['Version'] = version
+            cres = fishclient._extract_fwinfo(res)
+            if cres[0] is None:
+                continue
+            if buildid:
+                cres[1]['build'] = buildid
+            yield cres
+        raise pygexc.BypassGenericBehavior()
 
 

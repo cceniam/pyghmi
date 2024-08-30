@@ -963,7 +963,7 @@ class Command(object):
 
     def get_firmware(self, components=()):
         try:
-            for firminfo in self.oem.get_firmware_inventory(components):
+            for firminfo in self.oem.get_firmware_inventory(components, self):
                 yield firminfo
         except exc.BypassGenericBehavior:
             return
