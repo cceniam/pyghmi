@@ -21,4 +21,4 @@ dpkg-buildpackage -rfakeroot -uc -us -i
 cd -
 rm -rf $(find deb_dist -mindepth 1 -maxdepth 1 -type d)
 rm $1/*pyghmi*
-cp deb_dist/* $1/
+cp deb_dist/*.deb $1/
