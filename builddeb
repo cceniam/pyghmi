@@ -11,7 +11,10 @@ if grep wheezy /etc/os-release; then
     export DSCARGS=""
 fi
 # If not PBR, use the setup.py.tmpl
-$PYEXEC -c 'import pbr' || ./makesetup
+sed -e 's/~/./' ./makesetup > ./makesetup.deb
+chmod +x ./makesetup.deb
+./makesetup.deb
+#$PYEXEC -c 'import pbr' || ./makesetup
 VERSION=`$PYEXEC setup.py --version`
 $PYEXEC setup.py sdist
 py2dsc $DSCARGS dist/pyghmi-$VERSION.tar.gz
