@@ -519,7 +519,7 @@ class OEMHandler(object):
     def detach_remote_media(self):
         return None
 
-    def get_description(self):
+    def get_description(self, fishclient):
         return {}
 
     def get_firmware_inventory(self, components, fishclient):

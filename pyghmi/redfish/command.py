@@ -1078,7 +1078,7 @@ class Command(object):
         return self._oem
 
     def get_description(self):
-        return self.oem.get_description()
+        return self.oem.get_description(self)
 
     def get_event_log(self, clear=False):
         bmcinfo = self._do_web_request(self._bmcurl)

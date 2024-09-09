@@ -4,6 +4,12 @@ import pyghmi.exceptions as pygexc
 
 class OEMHandler(generic.OEMHandler):
 
+    def get_description(self, fishclient):
+        bmcstgs = fishclient._do_web_request('/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings')
+        heightu = bmcstgs.get('Attributes', {}).get('ServerConfigHeightU')
+        return {'height': heightu}
+
+
     def get_system_configuration(self, hideadvanced=True, fishclient=None):
         stgs = self._getsyscfg(fishclient)[0]
         outstgs = {}
