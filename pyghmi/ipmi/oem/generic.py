@@ -377,7 +377,7 @@ class OEMHandler(object):
     def list_media(self):
         raise exc.UnsupportedFunctionality()
 
-    def set_identify(self, on, duration):
+    def set_identify(self, on, duration, blink):
         """Provide an OEM override for set_identify
 
         Some systems may require an override for set identify.

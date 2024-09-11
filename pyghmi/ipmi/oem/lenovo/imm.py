@@ -968,6 +968,14 @@ class XCCClient(IMMClient):
                 fru['manufacturer'] = memi['memory_manufacturer']
                 break
 
+    def set_identify(self, on, duration, blink):
+        if blink:
+            self.grab_redfish_response_with_status(
+                '/redfish/v1/Systems/1',
+                {'IndicatorLED': 'Blinking'},
+                method='PATCH')
+            raise pygexc.BypassGenericBehavior()
+
     def get_description(self):
         dsc = self.wc.grab_json_response('/DeviceDescription.json')
         dsc = dsc[0]
