@@ -161,6 +161,7 @@ class Command(object):
         self._gpool = pool
         self._bmcv4ip = None
         self._bmcv6ip = None
+        self.xauthtoken = None
         for addrinf in socket.getaddrinfo(bmc, 0, 0, socket.SOCK_STREAM):
             if addrinf[0] == socket.AF_INET:
                 self._bmcv4ip = socket.inet_pton(addrinf[0], addrinf[-1][0])
@@ -173,12 +174,14 @@ class Command(object):
         self.wc.set_header('Accept-Encoding', 'gzip')
         self.wc.set_header('OData-Version', '4.0')
         overview = self.wc.grab_json_response('/redfish/v1/')
-        self.wc.set_basic_credentials(userid, password)
         self.username = userid
         self.password = password
+        self.wc.set_basic_credentials(self.username, self.password)
         self.wc.set_header('Content-Type', 'application/json')
         if 'Systems' not in overview:
             raise exc.PyghmiException('Redfish not ready')
+        if 'SessionService' in overview:
+            self._get_session_token(self.wc)
         systems = overview['Systems']['@odata.id']
         res = self.wc.grab_json_response_with_status(systems)
         if res[1] == 401:
@@ -205,6 +208,26 @@ class Command(object):
             self.sysurl = systems[0]['@odata.id']
         self.powerurl = self.sysinfo.get('Actions', {}).get(
             '#ComputerSystem.Reset', {}).get('target', None)
+
+    def _get_session_token(self, wc):
+        # specification actually indicates we can skip straight to this url
+        username = self.username
+        password = self.password
+        if not isinstance(username, str):
+            username = username.decode()
+        if not isinstance(password, str):
+            password = password.decode()
+        rsp = wc.grab_rsp('/redfish/v1/SessionService/Sessions',
+                          {'UserName': username, 'Password': password})
+        rsp.read()
+        self.xauthtoken = rsp.getheader('X-Auth-Token')
+        if self.xauthtoken:
+            if 'Authorization' in wc.stdheaders:
+                del wc.stdheaders['Authorization']
+            if 'Authorization' in self.wc.stdheaders:
+                del self.wc.stdheaders['Authorization']
+            wc.stdheaders['X-Auth-Token'] = self.xauthtoken
+            self.wc.stdheaders['X-Auth-Token'] = self.xauthtoken
 
     @property
     def _accountserviceurl(self):
@@ -520,6 +543,17 @@ class Command(object):
         finally:
             if 'If-Match' in wc.stdheaders:
                 del wc.stdheaders['If-Match']
+        if res[1] == 401 and self.xauthtoken:
+            wc.set_basic_credentials(self.username, self.password)
+            self._get_session_token(wc)
+            if etag:
+                wc.stdheaders['If-Match'] = etag
+            try:
+                res = wc.grab_json_response_with_status(url, payload,
+                                                        method=method)
+            finally:
+                if 'If-Match' in wc.stdheaders:
+                    del wc.stdheaders['If-Match']
         if res[1] < 200 or res[1] >= 300:
             try:
                 info = json.loads(res[0])
@@ -1430,3 +1464,4 @@ if __name__ == '__main__':
     print(repr(
         Command(sys.argv[1], os.environ['BMCUSER'], os.environ['BMCPASS'],
                 verifycallback=lambda x: True).get_power()))
+

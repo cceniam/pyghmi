@@ -272,6 +272,22 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
             return json.loads(body) if body else {}, rsp.status
         return body, rsp.status
 
+    def grab_rsp(self, url, data=None, referer=None, headers=None, method=None):
+        webclient = self.dupe()
+        if isinstance(data, dict):
+            data = json.dumps(data)
+        if data:
+            if not method:
+                method = 'POST'
+            webclient.request(method, url, data, referer=referer,
+                              headers=headers)
+        else:
+            if not method:
+                method = 'GET'
+            webclient.request(method, url, referer=referer, headers=headers)
+        rsp = webclient.getresponse()
+        return rsp
+
     def download(self, url, file):
         """Download a file to filename or file object
 
@@ -390,3 +406,4 @@ class SecureHTTPConnection(httplib.HTTPConnection, object):
         except httplib.CannotSendRequest:
             self.broken = True
             raise
+
