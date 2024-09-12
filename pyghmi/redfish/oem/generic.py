@@ -187,6 +187,17 @@ class OEMHandler(object):
         self._urlcache = cache
         self.webclient = webclient
 
+    def supports_expand(self, url):
+        # Unfortunately, the state of expand in redfish is pretty dicey,
+        # so an OEM handler must opt into this behavior
+        # There is a way an implementation advertises support, however
+        # this isn't to be trusted.
+        # Even among some generally reputable implementations, they will fail in some scenarios
+        # and you'll see in their documentation "some urls will fail if you try to expand them"
+        # perhaps being specific, but other times being vague, but in either case,
+        # nothing programattic to consume to know when to do or not do an expand..
+        return False
+
     def get_health(self, fishclient, verbose=True):
         health = fishclient.sysinfo.get('Status', {})
         health = health.get('HealthRollup', health.get('Health', 'Unknown'))
@@ -226,9 +237,8 @@ class OEMHandler(object):
                                             memsumstatus.get('Health', None))
             if memsumstatus != 'OK':
                 dimmfound = False
-                for mem in fishclient._do_web_request(
-                        fishclient.sysinfo['Memory']['@odata.id'])['Members']:
-                    dimminfo = fishclient._do_web_request(mem['@odata.id'])
+                dimmdata = self._get_mem_data()
+                for dimminfo in dimmdata['Members']:
                     if dimminfo.get('Status', {}).get(
                             'State', None) == 'Absent':
                         continue
@@ -600,32 +610,14 @@ class OEMHandler(object):
         sysinfo['UUID'] = sysinfo['UUID'].lower()
         yield ('System', sysinfo)
         self._hwnamemap = {}
-        cpumemurls = []
-        memurl = self._varsysinfo.get('Memory', {}).get('@odata.id', None)
-        if memurl:
-            cpumemurls.append(memurl)
-        cpurl = self._varsysinfo.get('Processors', {}).get('@odata.id', None)
-        if cpurl:
-            cpumemurls.append(cpurl)
-        list(self._do_bulk_requests(cpumemurls))
         adpurls = self._get_adp_urls()
-        if cpurl:
-            cpurls = self._get_cpu_urls()
-        else:
-            cpurls = []
-        if memurl:
-            memurls = self._get_mem_urls()
-        else:
-            memurls = []
         diskurls = self._get_disk_urls()
-        allurls = adpurls + cpurls + memurls + diskurls
+        allurls = adpurls + diskurls
         list(self._do_bulk_requests(allurls))
-        if cpurl:
-            for cpu in self._get_cpu_inventory(withids=withids, urls=cpurls):
-                yield cpu
-        if memurl:
-            for mem in self._get_mem_inventory(withids=withids, urls=memurls):
-                yield mem
+        for cpu in self._get_cpu_inventory(withids=withids):
+            yield cpu
+        for mem in self._get_mem_inventory(withids=withids):
+            yield mem
         for adp in self._get_adp_inventory(withids=withids, urls=adpurls):
             yield adp
         for disk in self._get_disk_inventory(withids=withids, urls=diskurls):
@@ -652,13 +644,11 @@ class OEMHandler(object):
         foundmacs = False
         macinfobyadpname = {}
         if 'NetworkInterfaces' in self._varsysinfo:
-            nifurls = self._do_web_request(self._varsysinfo['NetworkInterfaces']['@odata.id'])
-            nifurls = nifurls.get('Members', [])
-            nifurls = [x['@odata.id'] for x in nifurls]
-            for nifurl in nifurls:
-                nifinfo = self._do_web_request(nifurl)
-
-                nadurl = nifinfo.get('Links', {}).get('NetworkAdapter', {}).get("@odata.id")
+            nifdata = self._get_expanded_data(
+                self._varsysinfo['NetworkInterfaces']['@odata.id'])
+            for nifinfo in nifdata.get('Members', []):
+                nadurl = nifinfo.get(
+                    'Links', {}).get('NetworkAdapter', {}).get("@odata.id")
                 if nadurl:
                     nadinfo = self._do_web_request(nadurl)
                     if 'Name' not in nadinfo:
@@ -666,20 +656,31 @@ class OEMHandler(object):
                     nicname = nadinfo['Name']
                     yieldinf = {}
                     macidx = 1
-                    for ctrlr in nadinfo.get('Controllers', []):
-                        porturls = [x['@odata.id'] for x in ctrlr.get(
-                            'Links', {}).get('Ports', [])]
-                        for porturl in porturls:
-                            portinfo = self._do_web_request(porturl)
-                            macs = [x for x in portinfo.get(
-                                'Ethernet', {}).get(
-                                    'AssociatedMACAddresses', [])]
+                    if 'Ports' in nadinfo:
+                        for portinfo in self._get_expanded_data(
+                                nadinfo['Ports']['@odata.id']).get('Members', []):
+                            macs = [x for x in portinfo.get('Ethernet', {}).get('AssociatedMACAddresses', [])]
                             for mac in macs:
                                 label = 'MAC Address {}'.format(macidx)
                                 yieldinf[label] = _normalize_mac(mac)
                                 macidx += 1
                                 foundmacs = True
-                    macinfobyadpname[nicname] = yieldinf
+                            macinfobyadpname[nicname] = yieldinf
+                    else:
+                        for ctrlr in nadinfo.get('Controllers', []):
+                            porturls = [x['@odata.id'] for x in ctrlr.get(
+                                'Links', {}).get('Ports', [])]
+                            for porturl in porturls:
+                                portinfo = self._do_web_request(porturl)
+                                macs = [x for x in portinfo.get(
+                                    'Ethernet', {}).get(
+                                        'AssociatedMACAddresses', [])]
+                                for mac in macs:
+                                    label = 'MAC Address {}'.format(macidx)
+                                    yieldinf[label] = _normalize_mac(mac)
+                                    macidx += 1
+                                    foundmacs = True
+                        macinfobyadpname[nicname] = yieldinf
         if not urls:
             urls = self._get_adp_urls()
         for inf in self._do_bulk_requests(urls):
@@ -774,12 +775,9 @@ class OEMHandler(object):
         return urls
 
     def _get_cpu_inventory(self, onlynames=False, withids=False, urls=None):
-        if not urls:
-            urls = self._get_cpu_urls()
-        if not urls:
-            return
-        for res in self._do_bulk_requests(urls):
-            currcpuinfo, url = res
+        for currcpuinfo in self._get_cpu_data().get(
+                'Members', []):
+            url = currcpuinfo['@odata.id']
             name = currcpuinfo.get('Name', 'CPU')
             if name in self._hwnamemap:
                 self._hwnamemap[name] = None
@@ -804,21 +802,18 @@ class OEMHandler(object):
         return urls
 
     def _get_cpu_urls(self):
+        md = self._get_cpu_data(False)
+        return [x['@odata.id'] for x in md.get('Members', [])]
+
+    def _get_cpu_data(self, expand='.'):
         cpurl = self._varsysinfo.get('Processors', {}).get('@odata.id', None)
-        if cpurl is None:
-            urls = []
-        else:
-            cpurl = self._do_web_request(cpurl)
-            urls = [x['@odata.id'] for x in cpurl.get('Members', [])]
-        return urls
+        return self._get_expanded_data(cpurl, expand)
+
 
     def _get_mem_inventory(self, onlyname=False, withids=False, urls=None):
-        if not urls:
-            urls = self._get_mem_urls()
-        if not urls:
-            return
-        for mem in self._do_bulk_requests(urls):
-            currmeminfo, url = mem
+        memdata = self._get_mem_data()
+        for currmeminfo in memdata.get('Members', []): # self._do_bulk_requests(urls):
+            url = currmeminfo['@odata.id']
             name = currmeminfo.get('Name', 'Memory')
             if name in self._hwnamemap:
                 self._hwnamemap[name] = None
@@ -847,13 +842,29 @@ class OEMHandler(object):
             yield (name, meminfo)
 
     def _get_mem_urls(self):
+        md = self._get_mem_data(False)
+        return [x['@odata.id'] for x in md.get('Members', [])]
+
+    def _get_mem_data(self, expand='.'):
         memurl = self._varsysinfo.get('Memory', {}).get('@odata.id', None)
-        if not memurl:
-            urls = []
-        else:
-            memurl = self._do_web_request(memurl)
-            urls = [x['@odata.id'] for x in memurl.get('Members', [])]
-        return urls
+        return self._get_expanded_data(memurl, expand)
+
+    def _get_expanded_data(self, url, expand='.'):
+        topdata = []
+        if not url:
+            return topdata
+        if not expand:
+            return self._do_web_request(url)
+        elif self.supports_expand(url):
+            return self._do_web_request(url + '?$expand=' + expand)
+        else:  # emulate expand behavior
+            topdata = self._do_web_request(url)
+            newmembers = []
+            for x in topdata.get('Members', []):
+                newmembers.append(self._do_web_request(x['@odata.id']))
+            topdata['Members'] = newmembers
+            return topdata
+        return topdata
 
     def get_storage_configuration(self):
         raise exc.UnsupportedFunctionality(

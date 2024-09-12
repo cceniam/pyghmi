@@ -9,6 +9,9 @@ class OEMHandler(generic.OEMHandler):
         heightu = bmcstgs.get('Attributes', {}).get('ServerConfigHeightU')
         return {'height': heightu}
 
+    def supports_expand(self, url):
+        return True
+
 
     def get_system_configuration(self, hideadvanced=True, fishclient=None):
         stgs = self._getsyscfg(fishclient)[0]
