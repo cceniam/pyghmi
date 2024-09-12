@@ -996,6 +996,7 @@ class Command(object):
                              {'HostName': hostname}, 'PATCH')
 
     def get_firmware(self, components=()):
+        self._fwnamemap = {}
         try:
             for firminfo in self.oem.get_firmware_inventory(components, self):
                 yield firminfo
@@ -1003,7 +1004,6 @@ class Command(object):
             return
         fwlist = self._do_web_request(self._fwinventory)
         fwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
-        self._fwnamemap = {}
         for res in self._do_bulk_requests(fwurls):
             res = self._extract_fwinfo(res)
             if res[0] is None:

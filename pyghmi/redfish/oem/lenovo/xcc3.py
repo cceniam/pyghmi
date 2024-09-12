@@ -1,3 +1,4 @@
+import copy
 import pyghmi.redfish.oem.generic as generic
 import pyghmi.exceptions as pygexc
 
@@ -97,16 +98,14 @@ class OEMHandler(generic.OEMHandler):
         return currsettings, reginfo
 
     def get_firmware_inventory(self, components, fishclient):
-        fwlist = fishclient._do_web_request(fishclient._fwinventory)
-        rawfwurls = [x['@odata.id'] for x in fwlist.get('Members', [])]
-        fwurls = []
-        for fwurl in rawfwurls:
+        fwlist = fishclient._do_web_request(fishclient._fwinventory + '?$expand=.')
+        fwlist = copy.deepcopy(fwlist.get('Members', []))
+        self._fwnamemap = {}
+        for redres in fwlist:
+            fwurl = redres['@odata.id']
+            res = (redres, fwurl)
             if fwurl.startswith('/redfish/v1/UpdateService/FirmwareInventory/Bundle.'):
                 continue  # skip Bundle information for now
-            fwurls.append(fwurl)
-        self._fwnamemap = {}
-        for res in fishclient._do_bulk_requests(fwurls):
-            redres = res[0]
             if redres.get('Name', '').startswith('Firmware:'):
                 redres['Name'] = redres['Name'].replace('Firmware:', '')
             if redres['Name'].startswith('Firmware-PSoC') and 'Drive_Backplane' in redres["@odata.id"]:
