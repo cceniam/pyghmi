@@ -1,6 +1,8 @@
 import copy
+import json
 import pyghmi.redfish.oem.generic as generic
 import pyghmi.exceptions as pygexc
+import pyghmi.util.webclient as webclient
 
 
 class OEMHandler(generic.OEMHandler):
@@ -96,6 +98,32 @@ class OEMHandler(generic.OEMHandler):
             val.update(**extrainfo.get(setting, {}))
             currsettings[setting] = val
         return currsettings, reginfo
+
+    def upload_media(self, filename, progress=None, data=None):
+        wc = self.webclient
+        uploadthread = webclient.FileUploader(
+            wc, '/rdoc_upload', filename, data,
+            formname='file',
+            formwrap=True)
+        uploadthread.start()
+        while uploadthread.isAlive():
+            uploadthread.join(3)
+            if progress:
+                progress({'phase': 'upload',
+                          'progress': 100 * wc.get_upload_progress()})
+        rsp = json.loads(uploadthread.rsp)
+        if rsp['return'] != 0:
+            raise Exception('Issue uploading file')
+        remfilename = rsp['upload_filename']
+        if progress:
+            progress({'phase': 'upload',
+                      'progress': 100.0})
+        self._do_web_request(
+            '/redfish/v1/Systems/1/VirtualMedia/RDOC1',
+            {'Image':'file:///gpx/rdocupload/' + remfilename,
+             'WriteProtected': False}, method='PATCH')
+        if progress:
+            progress({'phase': 'complete'})
 
     def get_firmware_inventory(self, components, fishclient):
         fwlist = fishclient._do_web_request(fishclient._fwinventory + '?$expand=.')

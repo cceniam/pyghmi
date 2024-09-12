@@ -97,8 +97,9 @@ class FileDownloader(threading.Thread):
 
 
 def get_upload_form(filename, data, formname, otherfields):
+    ffilename = filename.split('/')[-1]
     if not formname:
-        formname = filename
+        formname = ffilename
     try:
         return uploadforms[filename]
     except KeyError:
@@ -109,7 +110,7 @@ def get_upload_form(filename, data, formname, otherfields):
         form = (b'--' + BND
                 + '\r\nContent-Disposition: form-data; '
                   'name="{0}"; filename="{1}"\r\n'.format(
-                      formname, filename).encode('utf-8'))
+                      formname, ffilename).encode('utf-8'))
         form += b'Content-Type: application/octet-stream\r\n\r\n' + data
         for ofield in otherfields:
             form += (b'\r\n--' + BND
