@@ -530,7 +530,14 @@ class OEMHandler(object):
         return None
 
     def get_description(self, fishclient):
+        for chassis in fishclient.sysinfo.get('Links', {}).get('Chassis', []):
+            chassisurl = chassis['@odata.id']
+            chassisinfo = self._do_web_request(chassisurl)
+            hmm = chassisinfo.get('HeightMm', None)
+            if hmm:
+                return {'height': hmm/44.45}
         return {}
+
 
     def get_firmware_inventory(self, components, fishclient):
         return []
