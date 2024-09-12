@@ -975,6 +975,7 @@ class XCCClient(IMMClient):
                 {'IndicatorLED': 'Blinking'},
                 method='PATCH')
             raise pygexc.BypassGenericBehavior()
+        raise pygexc.UnsupportedFunctionality()
 
     def get_description(self):
         dsc = self.wc.grab_json_response('/DeviceDescription.json')
