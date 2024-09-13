@@ -1106,6 +1106,7 @@ class Command(object):
     @property
     def oem(self):
         if not self._oem:
+            self._do_web_request(self.sysurl, cache=False)  # This is to trigger token validation and renewel
             self._oem = oem.get_oem_handler(
                 self.sysinfo, self.sysurl, self.wc, self._urlcache, self)
             self._oem.set_credentials(self.username, self.password)

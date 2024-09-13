@@ -894,7 +894,8 @@ class OEMHandler(object):
             'Remote media upload not supported on this platform')
 
     def update_firmware(self, filename, data=None, progress=None, bank=None):
-        usd = self._do_web_request('/redfish/v1/UpdateService')
+        # disable cache to make sure we trigger the token renewal logic if needed
+        usd = self._do_web_request('/redfish/v1/UpdateService', cache=False)
         upurl = usd.get('MultipartHttpPushUri', None)
         ismultipart = True
         if not upurl:
@@ -994,6 +995,26 @@ class OEMHandler(object):
                                 cache=True):
         return self._do_web_request(url, payload, method, cache), url
 
+    def _get_session_token(self, wc):
+        username = self.username
+        password = self.password
+        if not isinstance(username, str):
+            username = username.decode()
+        if not isinstance(password, str):
+            password = password.decode()
+        # specification actually indicates we can skip straight to this url
+        rsp = wc.grab_rsp('/redfish/v1/SessionService/Sessions',
+                          {'UserName': username, 'Password': password})
+        rsp.read()
+        self.xauthtoken = rsp.getheader('X-Auth-Token')
+        if self.xauthtoken:
+            if 'Authorization' in wc.stdheaders:
+                del wc.stdheaders['Authorization']
+            if 'Authorization' in self.webclient.stdheaders:
+                del self.webclient.stdheaders['Authorization']
+            wc.stdheaders['X-Auth-Token'] = self.xauthtoken
+            self.webclient.stdheaders['X-Auth-Token'] = self.xauthtoken
+
     def _do_web_request(self, url, payload=None, method=None, cache=True):
         res = None
         if cache and payload is None and method is None:
@@ -1002,6 +1023,11 @@ class OEMHandler(object):
             return res
         wc = self.webclient.dupe()
         res = wc.grab_json_response_with_status(url, payload, method=method)
+        if res[1] == 401 and 'X-Auth-Token' in self.webclient.stdheaders:
+            wc.set_basic_credentials(self.username, self.password)
+            self._get_session_token(wc)
+            res = wc.grab_json_response_with_status(url, payload,
+                                                    method=method)
         if res[1] < 200 or res[1] >= 300:
             try:
                 info = json.loads(res[0])
