@@ -738,6 +738,8 @@ class OEMHandler(object):
             if aname in macinfobyadpname:
                 del macinfobyadpname[aname]
             yield aname, yieldinf
+        if onlyname:
+            return
         if macinfobyadpname:
             for adp in macinfobyadpname:
                 yield adp, macinfobyadpname[adp]
