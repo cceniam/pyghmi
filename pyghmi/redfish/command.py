@@ -1195,35 +1195,11 @@ class Command(object):
         return retval
 
     def get_average_processor_temperature(self):
-        cputemps = []
-        for chassis in self.sysinfo.get('Links', {}).get('Chassis', []):
-            thermals = self._get_thermals(chassis)
-            for temp in thermals:
-                if temp.get('PhysicalContext', '') != 'CPU':
-                    continue
-                if temp.get('ReadingCelsius', None) is None:
-                    continue
-                cputemps.append(temp['ReadingCelsius'])
-        if not cputemps:
-            return  SensorReading(
-            None, {'name': 'Average Processor Temperature'}, value=None, units='°C',
-                   unavailable=True)
-        avgtemp = sum(cputemps) / len(cputemps)
-        return SensorReading(
-            None, {'name': 'Average Processor Temperature'}, value=avgtemp, units='°C')
+        return self.oem.get_average_processor_temperature(self)
+
 
     def get_system_power_watts(self):
-        totalwatts = 0
-        gotpower = False
-        for chassis in self.sysinfo.get('Links', {}).get('Chassis', []):
-            envinfo = self._get_chassis_env(chassis)
-            currwatts = envinfo.get('watts', None)
-            if currwatts is not None:
-                gotpower = True
-                totalwatts += envinfo['watts']
-        if not gotpower:
-            raise exc.UnsupportedFunctionality("System does not provide Power under redfish EnvironmentMetrics")
-        return totalwatts
+        return self.oem.get_system_power_watts(self)
 
     def get_inlet_temperature(self):
         inlets = []

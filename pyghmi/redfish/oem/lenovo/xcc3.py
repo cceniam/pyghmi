@@ -10,6 +10,18 @@ class OEMHandler(generic.OEMHandler):
     def supports_expand(self, url):
         return True
 
+    def get_system_power_watts(self, fishclient):
+        powerinfo = fishclient._do_web_request('/redfish/v1/Chassis/1/Sensors/power_Sys_Power')
+        return powerinfo['Reading']
+
+    def _get_cpu_temps(self, fishclient):
+        cputemps = []
+        for reading in super()._get_cpu_temps(fishclient):
+            if 'Margin' in reading['Name']:
+                continue
+            cputemps.append(reading)
+        return cputemps
+
     def get_system_configuration(self, hideadvanced=True, fishclient=None):
         stgs = self._getsyscfg(fishclient)[0]
         outstgs = {}
