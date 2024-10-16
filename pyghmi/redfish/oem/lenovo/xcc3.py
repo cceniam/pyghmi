@@ -37,7 +37,7 @@ class OEMHandler(generic.OEMHandler):
                 bmchangeset[stg.replace('BMC.', '')] = changeset[stg]
                 del changeset[stg]
             if stg.startswith('UEFI.'):
-                changeset[stg.replace('UEFI.' '')] = changeset[stg]
+                changeset[stg.replace('UEFI.', '')] = changeset[stg]
                 del changeset[stg]
             if stg.startswith('VPD.'):
                 vpdchangeset[stg.replace('VPD.', '')] = changeset[stg]
