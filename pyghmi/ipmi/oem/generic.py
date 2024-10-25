@@ -104,6 +104,8 @@ class OEMHandler(object):
             if sensor.sensor_type != 'Temperature':
                 continue
             if sensor.entity == 'External environment':
+                if 'exhaust' in sensor.sensor_name.lower():
+                    continue
                 extenv.append(sensor.sensor_name)
             if sensor.entity == 'Air inlet':
                 airinlets.append(sensor.sensor_name)
