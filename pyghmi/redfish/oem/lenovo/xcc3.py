@@ -69,6 +69,118 @@ class OEMHandler(generic.OEMHandler):
         fishclient._do_web_request('/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings', cache=False)
         return ret
 
+    oemacctmap = {
+        'password_reuse_count': 'MinimumPasswordReuseCycle',
+        'password_change_interval':  'MinimumPasswordChangeIntervalHours',
+        'password_expiration': 'PasswordExpirationPeriodDays',
+        'password_complexity': 'ComplexPassword',
+        }
+
+    acctmap = {
+        'password_login_failures': 'AccountLockoutThreshold',
+        'password_min_length': 'MinPasswordLength',
+        'password_lockout_period': 'AccountLockoutDuration',
+        }
+
+    def get_bmc_configuration(self):
+        settings = {}
+        acctsrv = self._do_web_request('/redfish/v1/AccountService')
+        for oemstg in self.oemacctmap:
+            settings[oemstg] = {
+                'value': acctsrv['Oem']['Lenovo'][self.oemacctmap[oemstg]]}
+        for stg in self.acctmap:
+            settings[stg] = {
+                'value': acctsrv[self.acctmap[stg]]}
+        bmcstgs = self._do_web_request('/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings')
+        usbeth = 'Enable' if bmcstgs['Attributes']['NetMgrUsb0Enabled'] == 'True' else 'Disable'
+        settings['usb_ethernet'] = {
+            'value': usbeth
+        }
+        fwd = 'Enable' if bmcstgs['Attributes']['NetMgrUsb0PortForwardingEnabled'] == 'True' else 'Disable'
+        settings['usb_ethernet_port_forwarding'] = fwd
+        mappings = []
+        for idx in range(1, 11):
+            if bmcstgs['Attributes']['NetMgrUsb0PortForwardingPortMapping.{}'.format(idx)] == '0,0':
+                continue
+            src, dst = bmcstgs['Attributes']['NetMgrUsb0PortForwardingPortMapping.{}'.format(idx)].split(',')
+            mappings.append('{}:{}'.format(src,dst))
+        settings['usb_forwarded_ports'] = {'value': ','.join(mappings)}
+        return settings
+
+    def set_bmc_configuration(self, changeset):
+        acctattribs = {}
+        usbsettings = {}
+        for key in changeset:
+            if isinstance(changeset[key], str):
+                changeset[key] = {'value': changeset[key]}
+            currval = changeset[key].get('value', None)
+            if key == 'password_complexity':
+                if currval.lower() in ("false", 0):
+                    currval = False
+                elif currval.lower() in ('true', 1):
+                    currval = True
+            elif key.lower().startswith('usb_'):
+                if 'forwarded_ports' not in key.lower():
+                    currval = currval.lower()
+                    if currval and 'disabled'.startswith(currval):
+                        currval = 'False'
+                    elif currval and 'enabled'.startswith(currval):
+                        currval = 'True'
+            else:
+                currval = int(currval)
+            if key.lower() in self.oemacctmap:
+                if 'Oem' not in acctattribs:
+                    acctattribs['Oem'] = {'Lenovo': {}}
+                acctattribs['Oem']['Lenovo'][
+                    self.oemacctmap[key.lower()]] = currval
+                if key.lower() == 'password_expiration':
+                    warntime = str(int(int(currval) * 0.08))
+                    acctattribs['Oem']['Lenovo'][
+                        'PasswordExpirationWarningPeriod'] = warntime
+            elif key.lower() in self.acctmap:
+                acctattribs[self.acctmap[key.lower()]] = currval
+            elif key.lower() in (
+                    'usb_ethernet', 'usb_ethernet_port_forwarding',
+                    'usb_forwarded_ports'):
+                usbsettings[key] = currval
+            else:
+                raise pygexc.InvalidParameterValue(
+                    '{0} not a known setting'.format(key))
+        if acctattribs:
+            self._do_web_request(
+                '/redfish/v1/AccountService', acctattribs, method='PATCH')
+            self._do_web_request('/redfish/v1/AccountService', cache=False)
+        if usbsettings:
+            self.apply_usb_configuration(usbsettings)
+
+    def apply_usb_configuration(self, usbsettings):
+        bmcattribs = {}
+        if 'usb_forwarded_ports' in usbsettings:
+            pairs = usbsettings['usb_forwarded_ports'].split(',')
+            idx = 1
+            for pair in pairs:
+                pair = pair.replace(':', ',')
+                bmcattribs[
+                    'NetMgrUsb0PortForwardingPortMapping.{}'.format(
+                        idx)] = pair
+                idx += 1
+            while idx < 11:
+                bmcattribs[
+                    'NetMgrUsb0PortForwardingPortMapping.{}'.format(
+                        idx)] = '0,0'
+                idx += 1
+        if 'usb_ethernet' in usbsettings:
+            bmcattribs['NetMgrUsb0Enabled'] = usbsettings['usb_ethernet']
+        if 'usb_ethernet_port_forwarding' in usbsettings:
+            bmcattribs[
+                'NetMgrUsb0PortForwardingEnabled'] = usbsettings[
+                    'usb_ethernet_port_forwarding']
+        self._do_web_request(
+            '/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings',
+            {'Attributes': bmcattribs}, method='PATCH')
+        self._do_web_request(
+            '/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings', cache=False)
+
     def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
         cfgin = self._get_lnv_bmcstgs(fishclient)[0]
         cfgout = {}
