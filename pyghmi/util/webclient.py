@@ -107,16 +107,22 @@ def get_upload_form(filename, data, formname, otherfields):
             data = data.read()
         except AttributeError:
             pass
-        form = (b'--' + BND
+        form = b''
+        for ofield in otherfields:
+            tfield = otherfields[ofield]
+            xtra=''
+            if isinstance(tfield, dict):
+                tfield = json.dumps(tfield)
+                xtra = '\r\nContent-Type: application/json'
+            form += (b'--' + BND
+                     + '\r\nContent-Disposition: form-data; '
+                       'name="{0}"{1}\r\n\r\n{2}\r\n'.format(
+                           ofield, xtra, tfield).encode('utf-8'))
+        form += (b'--' + BND
                 + '\r\nContent-Disposition: form-data; '
                   'name="{0}"; filename="{1}"\r\n'.format(
                       formname, ffilename).encode('utf-8'))
         form += b'Content-Type: application/octet-stream\r\n\r\n' + data
-        for ofield in otherfields:
-            form += (b'\r\n--' + BND
-                     + '\r\nContent-Disposition: form-data; '
-                       'name="{0}"\r\n\r\n{1}'.format(
-                           ofield, otherfields[ofield]).encode('utf-8'))
         form += b'\r\n--' + BND + b'--\r\n'
         uploadforms[filename] = form
         return form

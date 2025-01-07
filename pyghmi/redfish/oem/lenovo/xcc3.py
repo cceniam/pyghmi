@@ -3,7 +3,8 @@ import json
 import pyghmi.redfish.oem.generic as generic
 import pyghmi.exceptions as pygexc
 import pyghmi.util.webclient as webclient
-
+import zipfile
+import os.path
 
 class OEMHandler(generic.OEMHandler):
 
@@ -81,6 +82,32 @@ class OEMHandler(generic.OEMHandler):
         'password_min_length': 'MinPasswordLength',
         'password_lockout_period': 'AccountLockoutDuration',
         }
+
+    def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
+        if not otherfields and bank == 'backup':
+            uxzcount = 0
+            otherfields = {'UpdateParameters': {"Targets": ["/redfish/v1/UpdateService/FirmwareInventory/BMC-Backup"]}}
+            needseek = False
+            if data and hasattr(data, 'read'):
+                if zipfile.is_zipfile(data):
+                    needseek = True
+                    z = zipfile.ZipFile(data)
+                else:
+                    data.seek(0)
+            elif data is None and zipfile.is_zipfile(filename):
+                z = zipfile.ZipFile(filename)
+            if z:
+                for tmpname in z.namelist():
+                    if tmpname.startswith('payloads/'):
+                        uxzcount += 1
+                        if tmpname.endswith('.uxz'):
+                            wrappedfilename = tmpname
+            if uxzcount == 1 and wrappedfilename:
+                filename = os.path.basename(wrappedfilename)
+                data = z.open(wrappedfilename)
+            elif needseek:
+                data.seek(0)
+        super().update_firmware(filename, data=data, progress=progress, bank=bank, otherfields=otherfields)
 
     def get_bmc_configuration(self):
         settings = {}

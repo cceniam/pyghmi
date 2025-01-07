@@ -931,7 +931,7 @@ class OEMHandler(object):
         raise exc.UnsupportedFunctionality(
             'Remote media upload not supported on this platform')
 
-    def update_firmware(self, filename, data=None, progress=None, bank=None):
+    def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
         # disable cache to make sure we trigger the token renewal logic if needed
         usd = self._do_web_request('/redfish/v1/UpdateService', cache=False)
         upurl = usd.get('MultipartHttpPushUri', None)
@@ -952,7 +952,7 @@ class OEMHandler(object):
         try:
             uploadthread = webclient.FileUploader(
                 self.webclient, upurl, filename, data, formwrap=ismultipart,
-                excepterror=False)
+                excepterror=False, otherfields=otherfields)
             uploadthread.start()
             wc = self.webclient
             while uploadthread.isAlive():
