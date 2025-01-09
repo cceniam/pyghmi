@@ -155,17 +155,24 @@ class OEMHandler(generic.OEMHandler):
             settings[stg] = {
                 'value': acctsrv[self.acctmap[stg]]}
         bmcstgs = self._do_web_request('/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings')
-        usbeth = 'Enable' if bmcstgs['Attributes']['NetMgrUsb0Enabled'] == 'True' else 'Disable'
+        bmcattrs = bmcstgs['Attributes']
+        self.ethoverusb = True if 'EthOverUSBEnabled' in bmcattrs else False
+        usbcfg = bmcattrs.get('NetMgrUsb0Enabled', bmcattrs.get('EthOverUSBEnabled', 'False'))
+        usbeth = 'Enable' if usbcfg == 'True' else 'Disable'
         settings['usb_ethernet'] = {
             'value': usbeth
         }
-        fwd = 'Enable' if bmcstgs['Attributes']['NetMgrUsb0PortForwardingEnabled'] == 'True' else 'Disable'
+        usbcfg = bmcattrs.get('NetMgrUsb0PortForwardingEnabled', bmcattrs.get('EthOverUSBPortForwardingEnabled', 'False'))
+        fwd = 'Enable' if usbcfg == 'True' else 'Disable'
         settings['usb_ethernet_port_forwarding'] = fwd
         mappings = []
         for idx in range(1, 11):
-            if bmcstgs['Attributes']['NetMgrUsb0PortForwardingPortMapping.{}'.format(idx)] == '0,0':
+            keyname = 'NetMgrUsb0PortForwardingPortMapping.{}'.format(idx)
+            keyaltname = 'EthOverUSBPortForwardingPortMapping_{}'.format(idx)
+            currval = bmcattrs.get(keyname, bmcattrs.get(keyaltname, '0,0'))
+            if currval == '0,0':
                 continue
-            src, dst = bmcstgs['Attributes']['NetMgrUsb0PortForwardingPortMapping.{}'.format(idx)].split(',')
+            src, dst = currval.split(',')
             mappings.append('{}:{}'.format(src,dst))
         settings['usb_forwarded_ports'] = {'value': ','.join(mappings)}
         return settings
@@ -218,25 +225,33 @@ class OEMHandler(generic.OEMHandler):
 
     def apply_usb_configuration(self, usbsettings):
         bmcattribs = {}
+        if not hasattr(self, 'ethoverusb'):
+            self.get_bmc_configuration()
+
         if 'usb_forwarded_ports' in usbsettings:
             pairs = usbsettings['usb_forwarded_ports'].split(',')
             idx = 1
             for pair in pairs:
+                if self.ethoverusb:
+                    keyname = 'EthOverUSBPortForwardingPortMapping_{}'.format(idx)
+                else:
+                    keyname = 'NetMgrUsb0PortForwardingPortMapping.{}'.format(idx)
                 pair = pair.replace(':', ',')
-                bmcattribs[
-                    'NetMgrUsb0PortForwardingPortMapping.{}'.format(
-                        idx)] = pair
+                bmcattribs[keyname] = pair
                 idx += 1
             while idx < 11:
-                bmcattribs[
-                    'NetMgrUsb0PortForwardingPortMapping.{}'.format(
-                        idx)] = '0,0'
+                if self.ethoverusb:
+                    keyname = 'EthOverUSBPortForwardingPortMapping_{}'.format(idx)
+                else:
+                    keyname = 'NetMgrUsb0PortForwardingPortMapping.{}'.format(idx)
+                bmcattribs[keyname] = '0,0'
                 idx += 1
         if 'usb_ethernet' in usbsettings:
-            bmcattribs['NetMgrUsb0Enabled'] = usbsettings['usb_ethernet']
+            keyname = 'EthOverUSBEnabled' if self.ethoverusb else 'NetMgrUsb0Enabled'
+            bmcattribs[keyname] = usbsettings['usb_ethernet']
         if 'usb_ethernet_port_forwarding' in usbsettings:
-            bmcattribs[
-                'NetMgrUsb0PortForwardingEnabled'] = usbsettings[
+            keyname = 'EthOverUSBPortForwardingEnabled' if self.ethoverusb else 'NetMgrUsb0PortForwardingEnabled'
+            bmcattribs[keyname] = usbsettings[
                     'usb_ethernet_port_forwarding']
         self._do_web_request(
             '/redfish/v1/Managers/1/Oem/Lenovo/BMCSettings',
