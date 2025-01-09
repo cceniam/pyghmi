@@ -4,12 +4,48 @@ import pyghmi.redfish.oem.generic as generic
 import pyghmi.exceptions as pygexc
 import pyghmi.util.webclient as webclient
 import zipfile
+import time
 import os.path
 
 class OEMHandler(generic.OEMHandler):
 
     def supports_expand(self, url):
         return True
+
+    def get_diagnostic_data(self, savefile, progress=None, autosuffix=False):
+        tsk = self._do_web_request(
+            '/redfish/v1/Systems/1/LogServices/DiagnosticLog/Actions/LogService.CollectDiagnosticData',
+            {"DiagnosticDataType": "Manager", "SelectDataTypes": []})
+        taskrunning = True
+        taskurl = tsk.get('TaskMonitor', None)
+        pct = 0 if taskurl else 100
+        durl = None
+        while pct < 100 and taskrunning:
+            status = self._do_web_request(taskurl)
+            durl = status.get('AdditionalDataURI', '')
+            pct = status.get('PercentComplete', 0)
+            taskrunning = status.get('TaskState', 'Complete') == 'Running'
+            if progress:
+                progress({'phase': 'initializing', 'progress': float(pct)})
+            if taskrunning:
+                time.sleep(3)
+        if not durl:
+            raise Exception("Failed getting service data url")
+        fname = os.path.basename(durl)
+        if autosuffix and not savefile.endswith('.tar.zst'):
+            savefile += '-{0}'.format(fname)
+        fd = webclient.FileDownloader(self.webclient, durl, savefile)
+        fd.start()
+        while fd.isAlive():
+            fd.join(1)
+            if progress and self.webclient.get_download_progress():
+                progress({'phase': 'download',
+                          'progress': 100 * self.webclient.get_download_progress()})
+        if fd.exc:
+            raise fd.exc
+        if progress:
+            progress({'phase': 'complete'})
+        return savefile
 
     def get_system_power_watts(self, fishclient):
         powerinfo = fishclient._do_web_request('/redfish/v1/Chassis/1/Sensors/power_Sys_Power')
