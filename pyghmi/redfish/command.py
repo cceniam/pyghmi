@@ -850,7 +850,7 @@ class Command(object):
         rc = bmcinfo.get('Actions', {}).get('#Manager.ResetToDefaults', {})
         actinf = rc.get('ResetType@Redfish.AllowableValues', [])
         if 'ResetAll' in actinf:
-            acturl = actinf.get('target', None)
+            acturl = rc.get('target', None)
             if acturl:
                 self._do_web_request(acturl, {'ResetType': 'ResetAll'})
                 return
