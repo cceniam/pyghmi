@@ -178,36 +178,52 @@ class Command(object):
         self.password = password
         self.wc.set_basic_credentials(self.username, self.password)
         self.wc.set_header('Content-Type', 'application/json')
-        if 'Systems' not in overview:
+        if 'Systems' not in overview and 'Managers' not in overview:
             raise exc.PyghmiException('Redfish not ready')
         if 'SessionService' in overview:
             self._get_session_token(self.wc)
-        systems = overview['Systems']['@odata.id']
-        res = self.wc.grab_json_response_with_status(systems)
-        if res[1] == 401:
-            raise exc.PyghmiException('Access Denied')
-        elif res[1] < 200 or res[1] >= 300:
-            raise exc.PyghmiException(repr(res[0]))
-        members = res[0]
         self._varsensormap = {}
-        systems = members['Members']
-        if sysurl:
-            for system in systems:
-                if system['@odata.id'] == sysurl or system['@odata.id'].split('/')[-1] == sysurl:
-                    self.sysurl = system['@odata.id']
-                    break
+        self.powerurl = None
+        self.sysurl = None
+        if 'Managers' in overview:
+            bmcoll = systems = overview['Managers']['@odata.id']
+            res = self.wc.grab_json_response_with_status(bmcoll)
+            if res[1] == 401:
+                raise exc.PyghmiException('Access Denied')
+            elif res[1] < 200 or res[1] >= 300:
+                raise exc.PyghmiException(repr(res[0]))
+            bmcs = res[0]['Members']
+            if len(bmcs) == 1:
+                self._varbmcurl = bmcs[0]['@odata.id']
+        if 'Systems' in overview:
+            systems = overview['Systems']['@odata.id']
+            res = self.wc.grab_json_response_with_status(systems)
+            if res[1] == 401:
+                raise exc.PyghmiException('Access Denied')
+            elif res[1] < 200 or res[1] >= 300:
+                raise exc.PyghmiException(repr(res[0]))
+            members = res[0]
+            systems = members['Members']
+            if sysurl:
+                for system in systems:
+                    if system['@odata.id'] == sysurl or system['@odata.id'].split('/')[-1] == sysurl:
+                        self.sysurl = system['@odata.id']
+                        break
+                else:
+                    raise exc.PyghmiException(
+                        'Specified sysurl not found: {0}'.format(sysurl))
             else:
-                raise exc.PyghmiException(
-                    'Specified sysurl not found: {0}'.format(sysurl))
-        else:
-            if len(systems) != 1:
-                systems = [x for x in systems if 'DPU' not in x['@odata.id']]
-            if len(systems) != 1:
-                raise exc.PyghmiException(
-                    'Multi system manager, sysurl is required parameter')
-            self.sysurl = systems[0]['@odata.id']
-        self.powerurl = self.sysinfo.get('Actions', {}).get(
-            '#ComputerSystem.Reset', {}).get('target', None)
+                if len(systems) > 1:
+                    systems = [x for x in systems if 'DPU' not in x['@odata.id']]
+                if len(systems) > 1:
+                    raise exc.PyghmiException(
+                        'Multi system manager, sysurl is required parameter')
+                if len(systems):
+                    self.sysurl = systems[0]['@odata.id']
+                else:
+                    self.sysurl = None
+            self.powerurl = self.sysinfo.get('Actions', {}).get(
+                '#ComputerSystem.Reset', {}).get('target', None)
 
     def _get_session_token(self, wc):
         # specification actually indicates we can skip straight to this url
@@ -454,7 +470,13 @@ class Command(object):
 
     @property
     def sysinfo(self):
-        return self._do_web_request(self.sysurl)
+        if not self.sysurl:
+            return {}
+        try:
+            return self._do_web_request(self.sysurl)
+        except exc.RedfishError:
+            self.sysurl = None
+            return {}
 
     @property
     def bmcinfo(self):
@@ -1106,7 +1128,10 @@ class Command(object):
     @property
     def oem(self):
         if not self._oem:
-            self._do_web_request(self.sysurl, cache=False)  # This is to trigger token validation and renewel
+            if self.sysurl:
+                self._do_web_request(self.sysurl, cache=False)  # This is to trigger token validation and renewel
+            elif self._varbmcurl:
+                self._do_web_request(self._varbmcurl, cache=False)  # This is to trigger token validation and renewel
             self._oem = oem.get_oem_handler(
                 self.sysinfo, self.sysurl, self.wc, self._urlcache, self)
             self._oem.set_credentials(self.username, self.password)

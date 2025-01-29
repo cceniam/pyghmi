@@ -1,3 +1,16 @@
+# Copyright 2025 Lenovo Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import copy
 import json
 import pyghmi.redfish.oem.generic as generic
@@ -300,6 +313,25 @@ class OEMHandler(generic.OEMHandler):
             val.update(**extrainfo.get(setting, {}))
             currsettings[setting] = val
         return currsettings, reginfo
+
+    def get_description(self, fishclient):
+        rsp = self._get_expanded_data('/redfish/v1/Chassis')
+        for chassis in rsp['Members']:
+            if (chassis['@odata.id'] == '/redfish/v1/Chassis/1'
+                    and chassis['ChassisType'] != 'Blade'):
+                hmm = chassis.get('HeightMm', None)
+                if hmm:
+                    return {'height': hmm/44.45}
+            if (chassis['@odata.id'] == '/redfish/v1/Chassis/Enclosure'
+                    and chassis.get('ChassisType', None) == 'Enclosure'):
+                try:
+                    slot = chassis['Location']['PartLocation']['LocationOrdinalValue']
+                    slotnum = (2 * (slot >> 4) - 1) + ((slot & 15) % 10)
+                    slotcoord = [slot >> 4, (slot & 15 - 9)]
+                    return {'slot': slotnum, 'slotlabel': '{:02x}'.format(slot), 'slotcoord': slotcoord}
+                except KeyError:
+                    continue
+        return {}
 
     def upload_media(self, filename, progress=None, data=None):
         wc = self.webclient
