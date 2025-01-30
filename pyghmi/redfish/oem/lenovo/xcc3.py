@@ -327,7 +327,7 @@ class OEMHandler(generic.OEMHandler):
                 try:
                     slot = chassis['Location']['PartLocation']['LocationOrdinalValue']
                     slotnum = (2 * (slot >> 4) - 1) + ((slot & 15) % 10)
-                    slotcoord = [slot >> 4, (slot & 15 - 9)]
+                    slotcoord = [slot >> 4, (slot & 15) - 9]
                     return {'slot': slotnum, 'slotlabel': '{:02x}'.format(slot), 'slotcoord': slotcoord}
                 except KeyError:
                     continue
