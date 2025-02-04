@@ -834,8 +834,18 @@ class Command(object):
         self._do_web_request(url, {'ResetType': action})
 
     def set_identify(self, on=True, blink=None):
+        targurl = self.sysurl
+        if not targurl:
+            root = self._do_web_request('/redfish/v1')
+            systemsurl = root.get('Systems', {}).get('@odata.id', None)
+            if systemsurl:
+                targurl = self._do_web_request(systemsurl)
+                if len(targurl.get('Members', [])) == 1:
+                    targurl = targurl['Members'][0]['@odata.id']
+        if not targurl:
+            raise Exception("Unable to identify system url")
         self._do_web_request(
-            self.sysurl,
+            targurl,
             {'IndicatorLED': 'Blinking' if blink else 'Lit' if on else 'Off'},
             method='PATCH', etag='*')
 
