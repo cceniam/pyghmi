@@ -1141,70 +1141,7 @@ class Command(object):
         return self.oem.get_description(self)
 
     def get_event_log(self, clear=False):
-        bmcinfo = self._do_web_request(self._bmcurl)
-        lsurl = bmcinfo.get('LogServices', {}).get('@odata.id', None)
-        if not lsurl:
-            return
-        currtime = bmcinfo.get('DateTime', None)
-        correction = timedelta(0)
-        utz = tz.tzoffset('', 0)
-        ltz = tz.gettz()
-        if currtime:
-            currtime = parse_time(currtime)
-        if currtime:
-            now = datetime.now(utz)
-            try:
-                correction = now - currtime
-            except TypeError:
-                correction = now - currtime.replace(tzinfo=utz)
-        lurls = self._do_web_request(lsurl).get('Members', [])
-        for lurl in lurls:
-            lurl = lurl['@odata.id']
-            loginfo = self._do_web_request(lurl, cache=(not clear))
-            entriesurl = loginfo.get('Entries', {}).get('@odata.id', None)
-            if not entriesurl:
-                continue
-            logid = loginfo.get('Id', '')
-            entries = self._do_web_request(entriesurl, cache=False)
-            if clear:
-                # The clear is against the log service etag, not entries
-                # so we have to fetch service etag after we fetch entries
-                # until we can verify that the etag is consistent to prove
-                # that the clear is atomic
-                newloginfo = self._do_web_request(lurl, cache=False)
-                clearurl = newloginfo.get('Actions', {}).get(
-                    '#LogService.ClearLog', {}).get('target', '')
-                while clearurl:
-                    try:
-                        self._do_web_request(clearurl, method='POST',
-                                             payload={})
-                        clearurl = False
-                    except exc.PyghmiException as e:
-                        if 'EtagPreconditionalFailed' not in str(e):
-                            raise
-                        # This doesn't guarantee atomicity, but it mitigates
-                        # greatly.  Unfortunately some implementations
-                        # mutate the tag endlessly and we have no hope
-                        entries = self._do_web_request(entriesurl, cache=False)
-                        newloginfo = self._do_web_request(lurl, cache=False)
-            for log in entries.get('Members', []):
-                if ('Created' not in log and 'Message' not in log
-                        and 'Severity' not in log):
-                    # without any data, this log entry isn't actionable
-                    continue
-                record = {}
-                record['log_id'] = logid
-                parsedtime = parse_time(log.get('Created', ''))
-                if parsedtime:
-                    entime = parsedtime + correction
-                    entime = entime.astimezone(ltz)
-                    record['timestamp'] = entime.strftime('%Y-%m-%dT%H:%M:%S')
-                else:
-                    record['timestamp'] = log.get('Created', '')
-                record['message'] = log.get('Message', None)
-                record['severity'] = _healthmap.get(
-                    log.get('Severity', 'Warning'), const.Health.Ok)
-                yield record
+        return self.oem.get_event_log(clear, self)
 
     def _get_chassis_env(self, chassis):
         chassisurl = chassis['@odata.id']

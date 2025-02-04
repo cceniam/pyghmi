@@ -17,12 +17,17 @@ from fnmatch import fnmatch
 import json
 import os
 import re
+from datetime import datetime
+from datetime import timedelta
+from dateutil import tz
 import time
 
 import pyghmi.constants as const
 import pyghmi.exceptions as exc
 import pyghmi.media as media
 import pyghmi.util.webclient as webclient
+from pyghmi.util.parse import parse_time
+
 
 
 class SensorReading(object):
@@ -222,6 +227,75 @@ class OEMHandler(object):
                     continue
                 cputemps.append(temp)
         return cputemps
+
+    def get_event_log(self, clear=False, fishclient=None, extraurls=[]):
+        bmcinfo = self._do_web_request(fishclient._bmcurl)
+        lsurl = bmcinfo.get('LogServices', {}).get('@odata.id', None)
+        if not lsurl:
+            return
+        currtime = bmcinfo.get('DateTime', None)
+        correction = timedelta(0)
+        utz = tz.tzoffset('', 0)
+        ltz = tz.gettz()
+        if currtime:
+            currtime = parse_time(currtime)
+        if currtime:
+            now = datetime.now(utz)
+            try:
+                correction = now - currtime
+            except TypeError:
+                correction = now - currtime.replace(tzinfo=utz)
+        lurls = self._do_web_request(lsurl).get('Members', [])
+        lurls.extend(extraurls)
+        for lurl in lurls:
+            lurl = lurl['@odata.id']
+            loginfo = self._do_web_request(lurl, cache=(not clear))
+            entriesurl = loginfo.get('Entries', {}).get('@odata.id', None)
+            if not entriesurl:
+                continue
+            logid = loginfo.get('Id', '')
+            entries = self._do_web_request(entriesurl, cache=False)
+            if clear:
+                # The clear is against the log service etag, not entries
+                # so we have to fetch service etag after we fetch entries
+                # until we can verify that the etag is consistent to prove
+                # that the clear is atomic
+                newloginfo = self._do_web_request(lurl, cache=False)
+                clearurl = newloginfo.get('Actions', {}).get(
+                    '#LogService.ClearLog', {}).get('target', '')
+                while clearurl:
+                    try:
+                        self._do_web_request(clearurl, method='POST',
+                                            payload={})
+                        clearurl = False
+                    except exc.PyghmiException as e:
+                        if 'EtagPreconditionalFailed' not in str(e):
+                            raise
+                        # This doesn't guarantee atomicity, but it mitigates
+                        # greatly.  Unfortunately some implementations
+                        # mutate the tag endlessly and we have no hope
+                        entries = self._do_web_request(entriesurl, cache=False)
+                        newloginfo = self._do_web_request(lurl, cache=False)
+            for log in entries.get('Members', []):
+                if ('Created' not in log and 'Message' not in log
+                        and 'Severity' not in log):
+                    # without any data, this log entry isn't actionable
+                    continue
+                record = {}
+                record['log_id'] = logid
+                parsedtime = parse_time(log.get('Created', ''))
+                if not parsedtime:
+                    parsedtime = parse_time(log.get('EventTimestamp', ''))
+                if parsedtime:
+                    entime = parsedtime + correction
+                    entime = entime.astimezone(ltz)
+                    record['timestamp'] = entime.strftime('%Y-%m-%dT%H:%M:%S')
+                else:
+                    record['timestamp'] = log.get('Created', '')
+                record['message'] = log.get('Message', None)
+                record['severity'] = _healthmap.get(
+                    log.get('Severity', 'Warning'), const.Health.Ok)
+                yield record
 
     def get_average_processor_temperature(self, fishclient):
         cputemps = self._get_cpu_temps(fishclient)

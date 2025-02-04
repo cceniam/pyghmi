@@ -53,10 +53,14 @@ class OEMHandler(generic.OEMHandler):
         health = healthlookup.get(health, pygconst.Health.Critical)
         return {'health': health}
 
+
     def reseat_bay(self, bay):
         bayid = _baytolabel(bay)
         url = '/redfish/v1/Chassis/chassis1/Oem/Lenovo/Nodes/{}/Actions/Node.Reseat'.format(bayid)
         rsp = self._do_web_request(url, method='POST')
+
+    def get_event_log(self, clear=False, fishclient=None):
+        return super().get_event_log(clear, fishclient, extraurls=[{'@odata.id':'/redfish/v1/Chassis/chassis1/LogServices/EventLog'}])
 
     def get_description(self, fishclient):
         return {'height': 13, 'slot': 0, 'slots': [8, 2]}
