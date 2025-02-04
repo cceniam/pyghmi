@@ -34,6 +34,7 @@ def _baytonumber(bay):
                 return None
     return None
 
+
 def _baytolabel(bay):
     try:
         baynum =  int(bay)
@@ -52,6 +53,9 @@ class OEMHandler(generic.OEMHandler):
         health = rsp.get('Status', {}).get('Health', 'Unknown').lower()
         health = healthlookup.get(health, pygconst.Health.Critical)
         return {'health': health}
+
+    def get_system_configuration(self, hideadvanced=True, fishclient=None):
+        return {}
 
     def _get_node_info(self):
         nodeinfo = self._varsysinfo

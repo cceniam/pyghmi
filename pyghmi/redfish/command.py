@@ -1,5 +1,5 @@
 # coding: utf8
-# Copyright 2021 Lenovo
+# Copyright 2025 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -891,6 +891,54 @@ class Command(object):
 
     def set_system_configuration(self, changeset):
         return self.oem.set_system_configuration(changeset, self)
+
+    def get_ntp_enabled(self):
+        bmcinfo = self._do_web_request(self._bmcurl)
+        netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
+        if netprotocols:
+            netprotoinfo = self._do_web_request(netprotocols)
+            enabled = netprotoinfo.get('NTP', {}).get('ProtocolEnabled', False)
+            return enabled
+        return False
+
+    def set_ntp_enabled(self, enable):
+        bmcinfo = self._do_web_request(self._bmcurl)
+        netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
+        if netprotocols:
+            request = {'NTP':{'ProtocolEnabled': enable}}
+            self._do_web_request(netprotocols, request, method='PATCH')
+            self._do_web_request(netprotocols, cache=0)
+
+    def get_ntp_servers(self):
+        bmcinfo = self._do_web_request(self._bmcurl)
+        netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
+        if not netprotocols:
+            return []
+        netprotoinfo = self._do_web_request(netprotocols)
+        return netprotoinfo.get('NTP', {}).get('NTPServers', [])
+
+    def set_ntp_server(self, server, index=None):
+        bmcinfo = self._do_web_request(self._bmcurl)
+        netprotocols = bmcinfo.get('NetworkProtocol', {}).get('@odata.id', None)
+        currntpservers = self.get_ntp_servers()
+        if index is None:
+            if server in currntpservers:
+                return
+            currntpservers = [server] + currntpservers
+        else:
+            if (index + 1) > len(currntpservers):
+                if not server:
+                    return
+                currntpservers.append(server)
+            else:
+                if not server:
+                    del currntpservers[index]
+                else:
+                    currntpservers[index] = server
+        request = {'NTP':{'NTPServers': currntpservers}}
+        self._do_web_request(netprotocols, request, method='PATCH')
+        self._do_web_request(netprotocols, cache=0)
+
 
     def clear_bmc_configuration(self):
         """Reset BMC to factory default
