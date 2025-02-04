@@ -113,6 +113,7 @@ def natural_sort(iterable):
 class SensorReading(object):
     def __init__(self, healthinfo, sensor=None, value=None, units=None,
                  unavailable=False):
+        self.states = []
         if sensor:
             self.name = sensor['name']
         else:
@@ -122,7 +123,8 @@ class SensorReading(object):
             self.states = [healthinfo.get('Status', {}).get('Health',
                                                             'Unknown')]
             self.health = _healthmap[healthinfo['Status']['Health']]
-            self.states = [healthinfo['Status']['Health']]
+            if healthinfo['Status']['Health'].lower() == 'ok':
+                self.states = []
         self.value = value
         self.state_ids = None
         self.imprecision = None
@@ -675,34 +677,53 @@ class Command(object):
     @property
     def _sensormap(self):
         if not self._varsensormap:
-            for chassis in self.sysinfo.get('Links', {}).get('Chassis', []):
-                self._mapchassissensors(chassis)
+            if self.sysinfo:
+                for chassis in self.sysinfo.get('Links', {}).get('Chassis', []):
+                    self._mapchassissensors(chassis)
+            else:  # no system, but check if this is a singular chassis
+                rootinfo = self._do_web_request('/redfish/v1/')
+                chassiscol = rootinfo.get('Chassis', {}).get('@odata.id', '')
+                if chassiscol:
+                    chassislist = self._do_web_request(chassiscol)
+                    if len(chassislist.get('Members', [])) == 1:
+                        self._mapchassissensors(chassislist['Members'][0])
         return self._varsensormap
 
     def _mapchassissensors(self, chassis):
         chassisurl = chassis['@odata.id']
         chassisinfo = self._do_web_request(chassisurl)
-        powurl = chassisinfo.get('Power', {}).get('@odata.id', '')
-        if powurl:
-            powinf = self._do_web_request(powurl)
-            for voltage in powinf.get('Voltages', []):
-                if 'Name' in voltage:
-                    self._varsensormap[voltage['Name']] = {
-                        'name': voltage['Name'], 'url': powurl,
-                        'type': 'Voltage'}
-        thermurl = chassisinfo.get('Thermal', {}).get('@odata.id', '')
-        if thermurl:
-            therminf = self._do_web_request(thermurl)
-            for fan in therminf.get('Fans', []):
-                if 'Name' in fan:
-                    self._varsensormap[fan['Name']] = {
-                        'name': fan['Name'], 'type': 'Fan',
-                        'url': thermurl}
-            for temp in therminf.get('Temperatures', []):
-                if 'Name' in temp:
-                    self._varsensormap[temp['Name']] = {
-                        'name': temp['Name'], 'type': 'Temperature',
-                        'url': thermurl}
+        sensors = chassisinfo.get('Sensors', {}).get('@odata.id', '')
+        if sensors:
+            sensorinf = self._do_web_request(sensors)
+            for sensor in sensorinf.get('Members', []):
+                sensedata = self._do_web_request(sensor['@odata.id'])
+                if 'Name' in sensedata:
+                    sensetype = sensedata.get('ReadingType', 'Unknown')
+                    self._varsensormap[sensedata['Name']] = {
+                        'name': sensedata['Name'], 'type': sensetype,
+                        'url': sensor['@odata.id'], 'generic': True}
+        else:
+            powurl = chassisinfo.get('Power', {}).get('@odata.id', '')
+            if powurl:
+                powinf = self._do_web_request(powurl)
+                for voltage in powinf.get('Voltages', []):
+                    if 'Name' in voltage:
+                        self._varsensormap[voltage['Name']] = {
+                            'name': voltage['Name'], 'url': powurl,
+                            'type': 'Voltage'}
+            thermurl = chassisinfo.get('Thermal', {}).get('@odata.id', '')
+            if thermurl:
+                therminf = self._do_web_request(thermurl)
+                for fan in therminf.get('Fans', []):
+                    if 'Name' in fan:
+                        self._varsensormap[fan['Name']] = {
+                            'name': fan['Name'], 'type': 'Fan',
+                            'url': thermurl}
+                for temp in therminf.get('Temperatures', []):
+                    if 'Name' in temp:
+                        self._varsensormap[temp['Name']] = {
+                            'name': temp['Name'], 'type': 'Temperature',
+                            'url': thermurl}
         for subchassis in chassisinfo.get('Links', {}).get('Contains', []):
             self._mapchassissensors(subchassis)
 
@@ -1195,6 +1216,16 @@ class Command(object):
             yield self.get_sensor_reading(sensor)
 
     def _extract_reading(self, sensor, reading):
+        if sensor.get('generic', False):  # generic sensor
+            val = reading.get('Reading', None)
+            unavail = val is None
+            units = reading.get('ReadingUnits', None)
+            if units == 'Cel':
+                units = '°C'
+            if units == 'cft_i/min':
+                units = 'CFM'
+            return SensorReading(reading, None, value=val, units=units,
+                          unavailable=unavail)
         if sensor['type'] == 'Fan':
             for fan in reading['Fans']:
                 if fan['Name'] == sensor['name']:
