@@ -53,6 +53,21 @@ class OEMHandler(generic.OEMHandler):
         health = healthlookup.get(health, pygconst.Health.Critical)
         return {'health': health}
 
+    def _get_node_info(self):
+        nodeinfo = self._varsysinfo
+        if not nodeinfo:
+            overview = self._do_web_request('/redfish/v1/')
+            chassismembs = overview.get('Chassis', {}).get('@odata.id', None)
+            if not chassismembs:
+                return nodeinfo
+            chassislist = self._do_web_request(chassismembs)
+            chassismembs = chassislist.get('Members', [])
+            if len(chassismembs) == 1:
+                chassisurl = chassismembs[0]['@odata.id']
+                nodeinfo = self._do_web_request(chassisurl)
+        nodeinfo['SKU'] = nodeinfo['Model']
+        nodeinfo['Model'] = 'N1380 Enclosure'
+        return nodeinfo
 
     def reseat_bay(self, bay):
         bayid = _baytolabel(bay)

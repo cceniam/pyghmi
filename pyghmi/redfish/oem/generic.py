@@ -688,15 +688,30 @@ class OEMHandler(object):
         for adp in self._get_adp_inventory(True, withids):
             yield adp
 
+    def _get_node_info(self):
+        nodeinfo = self._varsysinfo
+        if not nodeinfo:
+            overview = self._do_web_request('/redfish/v1/')
+            chassismembs = overview.get('Chassis', {}).get('@odata.id', None)
+            if not chassismembs:
+                return nodeinfo
+            chassislist = self._do_web_request(chassismembs)
+            chassismembs = chassislist.get('Members', [])
+            if len(chassismembs) == 1:
+                chassisurl = chassismembs[0]['@odata.id']
+                nodeinfo = self._do_web_request(chassisurl)
+        return nodeinfo
+
     def get_inventory_of_component(self, component):
         if component.lower() == 'system':
+            nodeinfo = self._get_node_info()
             sysinfo = {
-                'UUID': self._varsysinfo.get('UUID', ''),
-                'Serial Number': self._varsysinfo.get('SerialNumber', ''),
-                'Manufacturer': self._varsysinfo.get('Manufacturer', ''),
-                'Product name': self._varsysinfo.get('Model', ''),
-                'Model': self._varsysinfo.get(
-                    'SKU', self._varsysinfo.get('PartNumber', '')),
+                'UUID': nodeinfo.get('UUID', ''),
+                'Serial Number': nodeinfo.get('SerialNumber', ''),
+                'Manufacturer': nodeinfo.get('Manufacturer', ''),
+                'Product name': nodeinfo.get('Model', ''),
+                'Model': nodeinfo.get(
+                    'SKU', nodeinfo.get('PartNumber', '')),
             }
             if sysinfo['UUID'] and '-' not in sysinfo['UUID']:
                 sysinfo['UUID'] = '-'.join((
@@ -711,13 +726,14 @@ class OEMHandler(object):
                     return invpair[1]
 
     def get_inventory(self, withids=False):
+        nodeinfo = self._get_node_info()
         sysinfo = {
-            'UUID': self._varsysinfo.get('UUID', ''),
-            'Serial Number': self._varsysinfo.get('SerialNumber', ''),
-            'Manufacturer': self._varsysinfo.get('Manufacturer', ''),
-            'Product name': self._varsysinfo.get('Model', ''),
-            'Model': self._varsysinfo.get(
-                'SKU', self._varsysinfo.get('PartNumber', '')),
+            'UUID': nodeinfo.get('UUID', ''),
+            'Serial Number': nodeinfo.get('SerialNumber', ''),
+            'Manufacturer': nodeinfo.get('Manufacturer', ''),
+            'Product name': nodeinfo.get('Model', ''),
+            'Model': nodeinfo.get(
+                'SKU', nodeinfo.get('PartNumber', '')),
         }
         if sysinfo['UUID'] and '-' not in sysinfo['UUID']:
             sysinfo['UUID'] = '-'.join((
@@ -926,6 +942,8 @@ class OEMHandler(object):
 
     def _get_cpu_data(self, expand='.'):
         cpurl = self._varsysinfo.get('Processors', {}).get('@odata.id', None)
+        if not cpurl:
+            return {}
         return self._get_expanded_data(cpurl, expand)
 
 
@@ -966,6 +984,8 @@ class OEMHandler(object):
 
     def _get_mem_data(self, expand='.'):
         memurl = self._varsysinfo.get('Memory', {}).get('@odata.id', None)
+        if not memurl:
+            return {}
         return self._get_expanded_data(memurl, expand)
 
     def _get_expanded_data(self, url, expand='.'):
