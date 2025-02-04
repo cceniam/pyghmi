@@ -20,12 +20,43 @@ healthlookup = {
     'critical': pygconst.Health.Critical
 }
 
+def _baytonumber(bay):
+    try:
+        return int(bay)
+    except ValueError:
+        if len(bay) == 2:
+            # Treat a hexadecimal system as a leading decimal digit and letter compile
+            # 1a == slot 1, 1b == slot 2, 2a == slot 1, etc..
+            try:
+                tmp = int(bay, 16)
+                return (2 * (tmp >> 4) - 1) + ((tmp & 15) % 10)
+            except ValueError:
+                return None
+    return None
+
+def _baytolabel(bay):
+    try:
+        baynum =  int(bay)
+        # need to convert to 1a, 1b, etc...
+        vertidx = ((baynum - 1) // 2 + 1) << 4
+        horizidx = (baynum - 1) % 2 + 10
+        bayid = vertidx | horizidx
+        return '{:02x}'.format(bayid)
+    except ValueError:
+        return bay
+    return None
+
 class OEMHandler(generic.OEMHandler):
     def get_health(self, fishclient, verbose=True):
         rsp = self._do_web_request('/redfish/v1/Chassis/chassis1')
         health = rsp.get('Status', {}).get('Health', 'Unknown').lower()
         health = healthlookup.get(health, pygconst.Health.Critical)
         return {'health': health}
+
+    def reseat_bay(self, bay):
+        bayid = _baytolabel(bay)
+        url = '/redfish/v1/Chassis/chassis1/Oem/Lenovo/Nodes/{}/Actions/Node.Reseat'.format(bayid)
+        rsp = self._do_web_request(url, method='POST')
 
     def get_description(self, fishclient):
         return {'height': 13, 'slot': 0, 'slots': [8, 2]}
