@@ -119,6 +119,7 @@ def str_to_size(sizestr):
 
 
 class OEMHandler(generic.OEMHandler):
+    usegenericsensors = False
     logouturl = '/api/providers/logout'
     bmcname = 'XCC'
     ADP_URL = '/api/dataset/imm_adapters?params=pci_GetAdapters'

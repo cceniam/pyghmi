@@ -184,6 +184,7 @@ class AttrDependencyHandler(object):
 
 class OEMHandler(object):
     hostnic = None
+    usegenericsensors = True
 
     def __init__(self, sysinfo, sysurl, webclient, cache, gpool=None):
         self._gpool = gpool

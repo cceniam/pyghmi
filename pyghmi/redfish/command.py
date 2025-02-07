@@ -68,6 +68,7 @@ _healthmap = {
     'Unknown': const.Health.Warning,
     'Warning': const.Health.Warning,
     'OK': const.Health.Ok,
+    None: const.Health.Ok,
 }
 
 
@@ -123,7 +124,7 @@ class SensorReading(object):
             self.states = [healthinfo.get('Status', {}).get('Health',
                                                             'Unknown')]
             self.health = _healthmap[healthinfo['Status']['Health']]
-            if healthinfo['Status']['Health'].lower() == 'ok':
+            if self.health == const.Health.Ok:
                 self.states = []
         self.value = value
         self.state_ids = None
@@ -692,7 +693,9 @@ class Command(object):
     def _mapchassissensors(self, chassis):
         chassisurl = chassis['@odata.id']
         chassisinfo = self._do_web_request(chassisurl)
-        sensors = chassisinfo.get('Sensors', {}).get('@odata.id', '')
+        sensors = None
+        if self.oem.usegenericsensors:
+            sensors = chassisinfo.get('Sensors', {}).get('@odata.id', '')
         if sensors:
             sensorinf = self._do_web_request(sensors)
             for sensor in sensorinf.get('Members', []):
