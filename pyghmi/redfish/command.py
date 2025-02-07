@@ -1379,9 +1379,18 @@ class Command(object):
         if vmcoll:
             vmlist = self._do_web_request(vmcoll)
             vmurls = [x['@odata.id'] for x in vmlist.get('Members', [])]
+        suspendedxauth = False
+        if 'X-Auth-Token' in self.wc.stdheaders:
+            suspendedxauth = True
+            del self.wc.stdheaders['X-Auth-Token']
+            self.wc.set_basic_credentials(self.username, self.password)
         try:
             self.oem.attach_remote_media(url, username, password, vmurls)
         except exc.BypassGenericBehavior:
+            if suspendedxauth:
+                self.wc.stdheaders['X-Auth-Token'] = self.xauthtoken
+                if 'Authorization' in self.wc.stdheaders:
+                    del self.wc.stdheaders['Authorization']
             return
         for vmurl in vmurls:
             vminfo = self._do_web_request(vmurl, cache=False)
@@ -1403,6 +1412,10 @@ class Command(object):
                     else:
                         raise
             break
+        if suspendedxauth:
+                self.wc.stdheaders['X-Auth-Token'] = self.xauthtoken
+                if 'Authorization' in self.wc.stdheaders:
+                    del self.wc.stdheaders['Authorization']
 
     def detach_remote_media(self):
         try:
