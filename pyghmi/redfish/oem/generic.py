@@ -788,17 +788,29 @@ class OEMHandler(object):
                     if 'Name' not in nadinfo:
                         continue
                     nicname = nadinfo['Name']
+                    if nicname == 'NetworkAdapter':
+                        nicname = nadinfo.get('Model', nicname)
                     yieldinf = {}
                     macidx = 1
                     if 'Ports' in nadinfo:
                         for portinfo in self._get_expanded_data(
                                 nadinfo['Ports']['@odata.id']).get('Members', []):
-                            macs = [x for x in portinfo.get('Ethernet', {}).get('AssociatedMACAddresses', [])]
-                            for mac in macs:
-                                label = 'MAC Address {}'.format(macidx)
-                                yieldinf[label] = _normalize_mac(mac)
-                                macidx += 1
-                                foundmacs = True
+                            ethinfo = portinfo.get('Ethernet', {})
+                            if ethinfo:
+                                macs = [x for x in ethinfo.get('AssociatedMACAddresses', [])]
+                                for mac in macs:
+                                    label = 'MAC Address {}'.format(macidx)
+                                    yieldinf[label] = _normalize_mac(mac)
+                                    macidx += 1
+                                    foundmacs = True
+                            ibinfo = portinfo.get('InfiniBand', {})
+                            if ibinfo:
+                                macs = [x for x in ibinfo.get('AssociatedPortGUIDs', [])]
+                                for mac in macs:
+                                    label = 'Port GUID {}'.format(macidx)
+                                    yieldinf[label] = mac
+                                    macidx += 1
+                                    foundmacs = True
                             macinfobyadpname[nicname] = yieldinf
                     else:
                         for ctrlr in nadinfo.get('Controllers', []):
