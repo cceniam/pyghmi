@@ -13,12 +13,29 @@
 # limitations under the License.
 import copy
 import json
+import pyghmi.constants as pygconst
 import pyghmi.redfish.oem.generic as generic
 import pyghmi.exceptions as pygexc
 import pyghmi.util.webclient as webclient
 import zipfile
 import time
 import os.path
+
+
+class SensorReading(object):
+    def __init__(self, healthinfo, sensor=None, value=None, units=None,
+                 unavailable=False):
+        if sensor:
+            self.name = sensor['name']
+        else:
+            self.name = healthinfo['name']
+            self.health = healthinfo['health']
+            self.states = healthinfo['states']
+            self.state_ids = healthinfo.get('state_ids', None)
+        self.value = value
+        self.imprecision = None
+        self.units = units
+        self.unavailable = unavailable
 
 class OEMHandler(generic.OEMHandler):
 
@@ -63,6 +80,42 @@ class OEMHandler(generic.OEMHandler):
     def get_system_power_watts(self, fishclient):
         powerinfo = fishclient._do_web_request('/redfish/v1/Chassis/1/Sensors/power_Sys_Power')
         return powerinfo['Reading']
+
+    def get_health(self, fishclient, verbose=True):
+        rsp = self._do_web_request('/api/providers/imm_active_events')
+        summary = {'badreadings': [], 'health': pygconst.Health.Ok}
+        fallbackdata = []
+        hmap = {
+            0 : pygconst.Health.Ok,
+            3: pygconst.Health.Critical,
+            2: pygconst.Health.Warning,
+        }
+        infoevents = False
+        existingevts = set([])
+        for item in rsp.get('items', ()):
+            # while usually the ipmi interrogation shall explain things,
+            # just in case there is a gap, make sure at least the
+            # health field is accurately updated
+            itemseverity = hmap.get(item.get('Severity', 2),
+                                    pygconst.Health.Critical)
+            if itemseverity == pygconst.Health.Ok:
+                infoevents = True
+                continue
+            if (summary['health'] < itemseverity):
+                summary['health'] = itemseverity
+            evtsrc = item.get('Oem', {}).get('Lenovo', {}).get('Source', '')
+            currevt = '{}:{}'.format(evtsrc, item['Message'])
+            if currevt in existingevts:
+                continue
+            existingevts.add(currevt)
+            fallbackdata.append(SensorReading({
+                'name': evtsrc,
+                'states': [item['Message']],
+                'health': itemseverity,
+                'type': evtsrc,
+            }, ''))
+        summary['badreadings'] = fallbackdata
+        return summary
 
     def _get_cpu_temps(self, fishclient):
         cputemps = []
