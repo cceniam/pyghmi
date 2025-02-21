@@ -351,6 +351,7 @@ class LenovoFirmwareConfig(object):
                             readonly = 'true'
                     possible = []
                     current = None
+                    currentidxes = []
                     default = None
                     reset = False
                     name = setting.find("mriName").text
@@ -381,6 +382,7 @@ class LenovoFirmwareConfig(object):
                                 instbynum[xid] = x
                                 defidx += 1
                             current = [instbynum[idx].text for idx in sorted(instbynum)]
+                            currentidxes = list(sorted(instbynum))
                         default = onedata.get('default', None)
                         if default == '':
                             default = None
@@ -442,6 +444,8 @@ class LenovoFirmwareConfig(object):
                         if current and len(current) > 1:
                             instidx = 1
                             for inst in current:
+                                if currentidxes:
+                                    instidx = currentidxes.pop(0)
                                 optname = '{0}.{1}'.format(optionname, instidx)
                                 options[optname] = dict(
                                     current=inst,
