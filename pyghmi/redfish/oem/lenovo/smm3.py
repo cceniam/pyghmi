@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import pyghmi.redfish.oem.generic as generic
 import pyghmi.constants as pygconst
+import pyghmi.util.webclient as webclient
+import time
 
 healthlookup = {
     'ok': pygconst.Health.Ok,
@@ -56,6 +59,49 @@ class OEMHandler(generic.OEMHandler):
 
     def get_system_configuration(self, hideadvanced=True, fishclient=None):
         return {}
+
+    def get_diagnostic_data(self, savefile, progress=None, autosuffix=False):
+        tsk = self._do_web_request(
+            '/redfish/v1/Managers/bmc/LogServices/Dump/Actions/LogService.CollectDiagnosticData',
+            {"DiagnosticDataType": "Manager"})
+        taskrunning = True
+        taskurl = tsk.get('@odata.id', None)
+        pct = 0 if taskurl else 100
+        durl = None
+        while pct < 100 and taskrunning:
+            status = self._do_web_request(taskurl)
+            durl = status.get('AdditionalDataURI', '')
+            pct = status.get('PercentComplete', 0)
+            taskrunning = status.get('TaskState', 'Complete') == 'Running'
+            if progress:
+                progress({'phase': 'initializing', 'progress': float(pct)})
+            if taskrunning:
+                time.sleep(3)
+        if not durl:
+            for hdr in status.get('Payload', {}).get('HttpHeaders', []):
+                if hdr.startswith('Location: '):
+
+                    enturl = hdr.replace('Location: ', '')
+                    entryinfo = self._do_web_request(enturl)
+                    durl = entryinfo.get('AdditionalDataURI', None)
+                    break
+        if not durl:
+            raise Exception("Failed getting service data url")
+        fname = os.path.basename(durl)
+        if autosuffix and not savefile.endswith('.tar.xz'):
+            savefile += time.strftime('-SMM3_%Y%m%d_%H%M%S.tar.xz')
+        fd = webclient.FileDownloader(self.webclient, durl, savefile)
+        fd.start()
+        while fd.isAlive():
+            fd.join(1)
+            if progress and self.webclient.get_download_progress():
+                progress({'phase': 'download',
+                          'progress': 100 * self.webclient.get_download_progress()})
+        if fd.exc:
+            raise fd.exc
+        if progress:
+            progress({'phase': 'complete'})
+        return savefile
 
     def _get_node_info(self):
         nodeinfo = self._varsysinfo
