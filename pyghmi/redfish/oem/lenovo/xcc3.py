@@ -432,9 +432,11 @@ class OEMHandler(generic.OEMHandler):
             swid = redres.get('SoftwareId', '')
             buildid = ''
             version = redres.get('Version', None)
-            if swid.startswith('FPGA-') or swid.startswith('UEFI-') or swid.startswith('BMC-'):
-                buildid = swid.split('-')[1] + version.split('-')[0]
-                version = '-'.join(version.split('-')[1:])
+            for prefix in ['FPGA-', 'UEFI-', 'BMC-', 'LXPM-', 'DRVWN-', 'DRVLN-', 'LXUM']:
+                if swid.startswith(prefix):
+                    buildid = swid.split('-')[1] + version.split('-')[0]
+                    version = '-'.join(version.split('-')[1:])
+                    break
             if version:
                 redres['Version'] = version
             cres = fishclient._extract_fwinfo(res)
