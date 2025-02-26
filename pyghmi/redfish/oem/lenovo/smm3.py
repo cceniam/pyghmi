@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import pyghmi.redfish.oem.generic as generic
 import pyghmi.constants as pygconst
@@ -115,9 +116,10 @@ class OEMHandler(generic.OEMHandler):
             if len(chassismembs) == 1:
                 chassisurl = chassismembs[0]['@odata.id']
                 nodeinfo = self._do_web_request(chassisurl)
-        nodeinfo['SKU'] = nodeinfo['Model']
-        nodeinfo['Model'] = 'N1380 Enclosure'
-        return nodeinfo
+        newnodeinfo = copy.deepcopy(nodeinfo)
+        newnodeinfo['SKU'] = nodeinfo['Model']
+        newnodeinfo['Model'] = 'N1380 Enclosure'
+        return newnodeinfo
 
     def reseat_bay(self, bay):
         bayid = _baytolabel(bay)
