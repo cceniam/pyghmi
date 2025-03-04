@@ -650,6 +650,9 @@ class OEMHandler(object):
         return {}
 
 
+    def _extract_fwinfo(self, inf):
+        return {}
+
     def get_firmware_inventory(self, components, fishclient):
         return []
 

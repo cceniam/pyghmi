@@ -104,6 +104,15 @@ class OEMHandler(generic.OEMHandler):
             progress({'phase': 'complete'})
         return savefile
 
+    def _extract_fwinfo(self, inf):
+        fwi, url = inf
+        currinf = {}
+        buildid = fwi.get('Oem', {}).get('Lenovo', {}).get('ExtendedVersion', None)
+        if buildid:
+            currinf['build'] = buildid
+        return currinf
+
+
     def _get_node_info(self):
         nodeinfo = self._varsysinfo
         if not nodeinfo:

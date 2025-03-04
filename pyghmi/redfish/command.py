@@ -1115,7 +1115,7 @@ class Command(object):
             yield res
 
     def _extract_fwinfo(self, inf):
-        currinf = {}
+        currinf = self._oem._extract_fwinfo(inf)
         fwi, url = inf
         fwname = fwi.get('Name', 'Unknown')
         if fwname in self._fwnamemap:
@@ -1129,6 +1129,7 @@ class Command(object):
         currinf['id'] = fwi.get('Id', None)
         currinf['version'] = fwi.get('Version', 'Unknown')
         currinf['date'] = parse_time(fwi.get('ReleaseDate', ''))
+        currinf['software_id'] = fwi.get('SoftwareId', '')
         if not (currinf['version'] or currinf['date']):
             return None, None
         # TODO(Jarrod Johnson): OEM extended data with buildid
