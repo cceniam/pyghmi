@@ -270,7 +270,7 @@ class OEMHandler(generic.OEMHandler):
                 acctattribs['Oem']['Lenovo'][
                     self.oemacctmap[key.lower()]] = currval
                 if key.lower() == 'password_expiration':
-                    warntime = str(int(int(currval) * 0.08))
+                    warntime = int(int(currval) * 0.08)
                     acctattribs['Oem']['Lenovo'][
                         'PasswordExpirationWarningPeriod'] = warntime
             elif key.lower() in self.acctmap:
