@@ -922,6 +922,18 @@ class XCCClient(IMMClient):
             return accinfo.get('RoleId', None)
         return None
 
+    def get_ikvm_methods(self):
+        return ['url']
+
+    def get_ikvm_launchdata(self):
+        access = self.grab_redfish_response_with_status('/redfish/v1/Managers/1/Oem/Lenovo/RemoteControl/Actions/LenovoRemoteControlService.GetRemoteConsoleToken', {})
+        if access[0].get('Token', None):
+            accessinfo = {
+                'url': '/#/login?{}&context=remote&mode=multi'.format(access[0]['Token'])
+                }
+            return accessinfo
+        return {}
+
     def set_user_access(self, uid, privilege_level):
         uid = uid - 1
         role = None

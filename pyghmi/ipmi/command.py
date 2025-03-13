@@ -654,6 +654,14 @@ class Command(object):
         return sel.EventHandler(self.init_sdr(), self).decode_pet(specifictrap,
                                                                   petdata)
 
+    def get_ikvm_methods(self):
+        self.oem_init()
+        return self._oem.get_ikvm_methods()
+
+    def get_ikvm_launchdata(self):
+        self.oem_init()
+        return self._oem.get_ikvm_launchdata()
+
     def get_inventory_descriptions(self):
         """Retrieve list of things that could be inventoried
 

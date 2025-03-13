@@ -1021,6 +1021,12 @@ class OEMHandler(object):
             return topdata
         return topdata
 
+    def get_ikvm_methods(self):
+        return []
+
+    def get_ikvm_launchdata(self):
+        return {}
+
     def get_storage_configuration(self):
         raise exc.UnsupportedFunctionality(
             'Remote storage configuration not supported on this platform')

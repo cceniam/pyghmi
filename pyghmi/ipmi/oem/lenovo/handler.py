@@ -216,6 +216,15 @@ class OEMHandler(generic.OEMHandler):
             return self.immhandler.remove_storage_configuration(cfgspec)
         return super(OEMHandler, self).remove_storage_configuration()
 
+    def get_ikvm_methods(self):
+        if self.has_xcc:
+            return ['url']
+
+    def get_ikvm_launchdata(self):
+        if self.has_xcc:
+            return self.immhandler.get_ikvm_launchdata()
+        return {}
+
     def clear_storage_arrays(self):
         if self.has_xcc:
             return self.immhandler.clear_storage_arrays()

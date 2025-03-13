@@ -77,6 +77,17 @@ class OEMHandler(generic.OEMHandler):
             progress({'phase': 'complete'})
         return savefile
 
+    def get_ikvm_methods(self):
+        return ['openbmc', 'url']
+
+    def get_ikvm_launchdata(self):
+        access = self._do_web_request('/redfish/v1/Managers/1/Oem/Lenovo/RemoteControl/Actions/LenovoRemoteControlService.GetRemoteConsoleToken', {})
+        if access.get('Token', None):
+            accessinfo = {
+                'url': '/#/login?{}&context=remote&mode=multi'.format(access['Token'])
+                }
+            return accessinfo
+
     def get_system_power_watts(self, fishclient):
         powerinfo = fishclient._do_web_request('/redfish/v1/Chassis/1/Sensors/power_Sys_Power')
         return powerinfo['Reading']

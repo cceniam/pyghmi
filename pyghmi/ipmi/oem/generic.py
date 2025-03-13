@@ -47,7 +47,14 @@ class OEMHandler(object):
         rsp = ipmicmd.xraw_command(netfn=0x2c, command=2, data=(0xdc, 1, 0, 0))
         wattage = struct.unpack('<H', rsp['data'][1:3])[0]
         return wattage
-    
+
+    def get_ikvm_methods(self):
+        return []
+
+    def get_ikvm_launchdata(self):
+        # no standard ikvm behavior, must be oem defined
+        return {}
+
     def get_average_processor_temperature(self, ipmicmd):
         # DCMI suggests preferrence for 0x37 ('Air inlet')
         # If not that, then 0x40 ('Air inlet')

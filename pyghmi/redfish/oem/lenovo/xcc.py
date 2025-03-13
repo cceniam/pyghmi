@@ -157,6 +157,17 @@ class OEMHandler(generic.OEMHandler):
                 del immsettings[setting]
         return immsettings
 
+    def get_ikvm_methods(self):
+        return ['url']
+
+    def get_ikvm_launchdata(self):
+        access = self._do_web_request('/redfish/v1/Managers/1/Oem/Lenovo/RemoteControl/Actions/LenovoRemoteControlService.GetRemoteConsoleToken', {})
+        if access.get('Token', None):
+            accessinfo = {
+                'url': '/#/login?{}&context=remote&mode=multi'.format(access['Token'])
+                }
+            return accessinfo
+
     def get_system_configuration(self, hideadvanced=True, fishclient=None,
                                  fetchimm=False):
         if not self.fwc:

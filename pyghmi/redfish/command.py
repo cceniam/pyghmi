@@ -432,6 +432,12 @@ class Command(object):
         self._do_web_request(accinfo[0], userinfo, method='PATCH', etag=etag)
         return True
 
+    def get_ikvm_methods(self):
+        return self.oem.get_ikvm_methods()
+
+    def get_ikvm_launchdata(self):
+        return self.oem.get_ikvm_launchdata()
+
     def user_delete(self, uid):
         self.oem.user_delete(uid)
 
