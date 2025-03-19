@@ -1184,6 +1184,13 @@ class OEMHandler(generic.OEMHandler):
                 else:
                     raise
 
+    def get_update_status(self):
+        if self.is_fpc or self.has_tsma:
+            return "ready"
+        if self.has_xcc:
+            return self.immhandler.get_update_status()
+        return super(OEMHandler, self).get_update_status()
+
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         if self.has_xcc:
             return self.immhandler.update_firmware(

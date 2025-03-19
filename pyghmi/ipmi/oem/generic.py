@@ -339,6 +339,10 @@ class OEMHandler(object):
         raise exc.UnsupportedFunctionality(
             'Remote storage configuration not supported on this platform')
 
+    def get_update_status(self):
+        raise exc.UnsupportedFunctionality(
+            'Firmwore update not supported on this platform')
+
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         raise exc.UnsupportedFunctionality(
             'Firmware update not supported on this platform')

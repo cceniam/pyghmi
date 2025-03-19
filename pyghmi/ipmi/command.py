@@ -2220,6 +2220,10 @@ class Command(object):
         self.oem_init()
         return self._oem.get_graphical_console()
 
+    def get_update_status(self):
+        self.oem_init()
+        return self._oem.get_update_status()
+
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         """Send file to BMC to perform firmware update
 

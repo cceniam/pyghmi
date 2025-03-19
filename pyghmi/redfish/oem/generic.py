@@ -1047,6 +1047,13 @@ class OEMHandler(object):
         raise exc.UnsupportedFunctionality(
             'Remote media upload not supported on this platform')
 
+    def get_update_status(self):
+        upd = self._do_web_request('/redfish/v1/UpdateService')
+        health = upd.get('Status', {}).get('Health', 'bad')
+        if health == 'OK':
+            return 'ready'
+        return 'unavailable'
+
     def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
         # disable cache to make sure we trigger the token renewal logic if needed
         usd = self._do_web_request('/redfish/v1/UpdateService', cache=False)

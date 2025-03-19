@@ -2128,7 +2128,14 @@ class XCCClient(IMMClient):
 
     def set_custom_user_privilege(self, uid, privilege):
         return self.set_user_access(self, uid, privilege)
-       
+
+    def get_update_status(self):
+        upd = self.grab_redfish_response_emptyonerror('/redfish/v1/UpdateService')
+        health = upd.get('Status', {}).get('Health', 'bod')
+        if health == 'OK':
+            return 'ready'
+        return 'unavailable'
+
     def update_firmware(self, filename, data=None, progress=None, bank=None):
         usd = self.grab_redfish_response_emptyonerror(
             '/redfish/v1/UpdateService')

@@ -1473,6 +1473,9 @@ class Command(object):
         """
         return self.oem.upload_media(filename, progress, data)
 
+    def get_update_status(self):
+        return self.oem.get_update_status()
+
     def update_firmware(self, file, data=None, progress=None, bank=None):
         """Send file to BMC to perform firmware update
 
