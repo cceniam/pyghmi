@@ -193,6 +193,10 @@ class OEMHandler(object):
         self._urlcache = cache
         self.webclient = webclient
 
+    def get_screenshot(self, outfile):
+        raise exc.UnsupportedFunctionality(
+            'Retrieving screenshot is not implemented for this platform')
+
     def supports_expand(self, url):
         # Unfortunately, the state of expand in redfish is pretty dicey,
         # so an OEM handler must opt into this behavior

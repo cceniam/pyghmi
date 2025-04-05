@@ -211,6 +211,11 @@ class OEMHandler(generic.OEMHandler):
             self._mrethidx = rsp['data'][0]
         return self._mrethidx
 
+    def get_screenshot(self, outfile):
+        if self.has_xcc:
+            return self.immhandler.get_screenshot(outfile)
+        return {}
+
     def remove_storage_configuration(self, cfgspec):
         if self.has_xcc:
             return self.immhandler.remove_storage_configuration(cfgspec)

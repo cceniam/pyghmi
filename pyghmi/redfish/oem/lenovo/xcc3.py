@@ -42,6 +42,12 @@ class OEMHandler(generic.OEMHandler):
     def supports_expand(self, url):
         return True
 
+    def get_screenshot(self, outfile):
+        url = '/web_download/Mini_ScreenShot.jpg'
+        fd = webclient.FileDownloader(self.webclient, url, outfile)
+        fd.start()
+        fd.join()
+
     def get_diagnostic_data(self, savefile, progress=None, autosuffix=False):
         tsk = self._do_web_request(
             '/redfish/v1/Systems/1/LogServices/DiagnosticLog/Actions/LogService.CollectDiagnosticData',

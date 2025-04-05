@@ -150,6 +150,13 @@ class OEMHandler(generic.OEMHandler):
         self.fwc = None
         self.fwo = None
 
+    def get_screenshot(self, outfile):
+        self.wc.grab_json_response('/api/providers/rp_screenshot')
+        url = '/download/HostScreenShot.png'
+        fd = webclient.FileDownloader(self.wc, url, outfile)
+        fd.start()
+        fd.join()
+
     def get_extended_bmc_configuration(self, fishclient, hideadvanced=True):
         immsettings = self.get_system_configuration(fetchimm=True, hideadvanced=hideadvanced)
         for setting in list(immsettings):

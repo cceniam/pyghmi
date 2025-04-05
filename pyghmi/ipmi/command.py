@@ -1660,6 +1660,10 @@ class Command(object):
         r['privilege_level'] = privilege_levels[data[1] & 0b00001111]
         return r
 
+    def get_screenshot(self, outfile):
+        self.oem_init()
+        return self._oem.get_screenshot(outfile)
+
     def get_channel_info(self, channel=None):
         """Get channel info
 

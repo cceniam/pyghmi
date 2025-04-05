@@ -914,6 +914,14 @@ class XCCClient(IMMClient):
         self.ipmicmd.ipmi_session.register_keepalive(self.keepalive, None)
         self.adp_referer = None
 
+    def get_screenshot(self, outfile):
+        self.wc.grab_json_response('/api/providers/rp_screenshot')
+        url = '/download/HostScreenShot.png'
+        fd = webclient.FileDownloader(self.wc, url, outfile)
+        fd.start()
+        fd.join()
+
+
     def get_user_privilege_level(self, uid):
         uid = uid - 1
         accurl = '/redfish/v1/AccountService/Accounts/{0}'.format(uid)
