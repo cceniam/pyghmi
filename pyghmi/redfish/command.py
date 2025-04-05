@@ -432,6 +432,9 @@ class Command(object):
         self._do_web_request(accinfo[0], userinfo, method='PATCH', etag=etag)
         return True
 
+    def get_screenshot(self, outfile):
+        return self.oem.get_screenshot(outfile)
+
     def get_ikvm_methods(self):
         return self.oem.get_ikvm_methods()
 
