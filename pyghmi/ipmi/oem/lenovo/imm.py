@@ -1303,8 +1303,14 @@ class XCCClient(IMMClient):
         return True
 
     def get_diagnostic_data(self, savefile, progress=None, autosuffix=False):
-        self.wc.grab_json_response('/api/providers/ffdc',
-                                   {'Generate_FFDC': 1})
+        result = self.wc.grab_json_response('/api/providers/ffdc',
+                                            {'Generate_FFDC_status': 1})
+        rsp = self.wc.grab_json_response('/api/providers/ffdc',
+                                         {'Generate_FFDC': 1})
+        if rsp.get('return', 0) == 4:
+            rsp = self.wc.grab_json_response('/api/providers/ffdc',
+                                             {'Generate_FFDC': 1,
+                                              'thermal_log': 0})
         percent = 0
         while percent != 100:
             ipmisession.Session.pause(3)
