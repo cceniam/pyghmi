@@ -51,7 +51,16 @@ class Unsupported(Exception):
 def fromstring(inputdata):
     if b'!entity' in inputdata.lower():
         raise Exception('Unsupported XML')
-    return etree.fromstring(inputdata)
+    try:
+        return etree.fromstring(inputdata)
+    except etree.XMLSyntaxError:
+        inputdata = bytearray(inputdata.decode('utf8', errors='backslashreplace').encode())
+        for i in range(len(inputdata)):
+            if inputdata[i] < 0x20 and inputdata[i] not in (9, 0xa, 0xd):
+                inputdata[i] = 63
+        inputdata = bytes(inputdata)
+        return etree.fromstring(inputdata)
+
 
 
 def run_command_with_retry(connection, data):
