@@ -17,6 +17,7 @@ import os
 import pyghmi.redfish.oem.generic as generic
 import pyghmi.constants as pygconst
 import pyghmi.util.webclient as webclient
+import pyghmi.exceptions as exc
 import time
 
 healthlookup = {
@@ -42,6 +43,9 @@ def _baytonumber(bay):
 def _baytolabel(bay):
     try:
         baynum =  int(bay)
+        if baynum < 1:
+            raise exc.UnsupportedFunctionality(
+                    'Reseat not supported for whole chassis')
         # need to convert to 1a, 1b, etc...
         vertidx = ((baynum - 1) // 2 + 1) << 4
         horizidx = (baynum - 1) % 2 + 10
