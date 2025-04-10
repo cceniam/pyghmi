@@ -1290,4 +1290,4 @@ class OEMHandler(object):
 
     def reseat_bay(self, bay):
         raise exc.UnsupportedFunctionality(
-            'Full reseat not supported on this platform')
+            'Reseat not supported on this platform')
