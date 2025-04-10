@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import base64
+import copy
 from fnmatch import fnmatch
 import json
 import os
@@ -573,13 +574,14 @@ class OEMHandler(object):
             pendingsettings, self.attrdeps, reginfo,
             fishclient._setbiosurl)
 
-    def _set_redfish_settings(self, changeset, fishclient, currsettings,
+    def _set_redfish_settings(self, inchangeset, fishclient, currsettings,
                               rawsettings, pendingsettings, attrdeps, reginfo,
                               seturl):
         etag = pendingsettings.get('@odata.etag', None)
         pendingsettings = pendingsettings.get('Attributes', {})
         dephandler = AttrDependencyHandler(attrdeps, rawsettings,
                                            pendingsettings)
+        changeset = copy.deepcopy(inchangeset)
         for change in list(changeset):
             if change not in currsettings:
                 found = False
