@@ -430,6 +430,13 @@ class OEMHandler(generic.OEMHandler):
             progress({'phase': 'complete'})
 
     def get_firmware_inventory(self, components, fishclient):
+        sfs = fishclient._do_web_request('/api/providers/system_firmware_status')
+        pendingscm = sfs.get('fpga_scm_pending_build', None)
+        pendinghpm = sfs.get('fpga_hpm_pending_build', None)
+        if pendingscm == '*':
+            pendingscm = None
+        if pendinghpm == '*':
+            pendinghpm = None
         fwlist = fishclient._do_web_request(fishclient._fwinventory + '?$expand=.')
         fwlist = copy.deepcopy(fwlist.get('Members', []))
         self._fwnamemap = {}
@@ -462,6 +469,14 @@ class OEMHandler(generic.OEMHandler):
             if buildid:
                 cres[1]['build'] = buildid
             yield cres
+            if cres[0] == 'SCM-FPGA' and pendingscm:
+                yield 'SCM-FPGA Pending', {
+                    'Name': 'SCM-FPGA Pending',
+                    'build': pendingscm}
+            elif cres[0] == 'HPM-FPGA' and pendinghpm:
+                yield 'HPM-FPGA Pending', {
+                    'Name': 'HPM-FPGA Pending',
+                    'build': pendinghpm}
         raise pygexc.BypassGenericBehavior()
 
 
