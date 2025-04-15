@@ -1308,11 +1308,15 @@ class OEMHandler(generic.OEMHandler):
             # the validating phase; add a retry here so we don't exit the loop in this case
             retry = 3
             while not complete and retry > 0:
-                pgress = self._do_web_request(monitorurl, cache=False)
+                try:
+                    pgress = self._do_web_request(monitorurl, cache=False)
+                except socket.timeout:
+                    pgress = None
                 if not pgress:
                     retry -= 1
                     time.sleep(3)
                     continue
+                retry = 3 # reset retry counter
                 for msg in pgress.get('Messages', []):
                     if 'Verify failed' in msg.get('Message', ''):
                         raise Exception(msg['Message'])
@@ -1334,6 +1338,8 @@ class OEMHandler(generic.OEMHandler):
                         time.sleep(3)
                 else:
                     time.sleep(3)
+            if not retry:
+                raise Exception('Falied to monitor update progress due to excessive timeouts')
             if bank == 'backup':
                 return 'complete'
             return 'pending'
