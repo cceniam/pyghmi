@@ -43,8 +43,10 @@ class OEMHandler(generic.OEMHandler):
         return True
 
     def get_screenshot(self, outfile):
+        wc = self.webclient.dupe()
+        self._get_session_token(wc)
         url = '/web_download/Mini_ScreenShot.jpg'
-        fd = webclient.FileDownloader(self.webclient, url, outfile)
+        fd = webclient.FileDownloader(wc, url, outfile)
         fd.start()
         fd.join()
 
