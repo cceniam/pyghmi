@@ -960,8 +960,11 @@ class XCCClient(IMMClient):
 
     def reseat(self):
         wc = self.wc.dupe(timeout=5)
-        rsp = wc.grab_json_response_with_status(
-            '/api/providers/virt_reseat', '{}')
+        try:
+            rsp = wc.grab_json_response_with_status(
+                '/api/providers/virt_reseat', '{}')
+        except socket.timeout:
+            return # probably reseated itself and unable to reply
         if rsp[1] == 500 and rsp[0] == 'Target Unavailable':
             return
         if rsp[1] != 200 or rsp[0].get('return', 1) != 0:

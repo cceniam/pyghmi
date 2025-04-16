@@ -311,8 +311,12 @@ class OEMHandler(generic.OEMHandler):
             raise pygexc.UnsupportedFunctionality(
                 'This is not an enclosure manager')
         wc = self.wc.dupe(timeout=5)
-        rsp = wc.grab_json_response_with_status(
-            '/api/providers/virt_reseat', '{}')
+        try:
+            rsp = wc.grab_json_response_with_status(
+                '/api/providers/virt_reseat', '{}')
+        except socket.timeout:
+            # Can't be certain, but most likely a timeout'
+            return
         if rsp[1] == 500 and rsp[0] == 'Target Unavailable':
             return
         if rsp[1] != 200 or rsp[0].get('return', 1) != 0:
