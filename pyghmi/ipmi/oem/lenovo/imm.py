@@ -617,7 +617,9 @@ class IMMClient(object):
                         skipkeys.add(fwi['key'])
                         if fwi.get('fw_status', 0) == 2:
                             bdata = {}
-                            if 'fw_version_pend' in fwi:
+                            if 'fw_pkg_version' in fwi and fwi['fw_pkg_version']:
+                                bdata['version'] = fwi['fw_pkg_version']
+                            elif 'fw_version_pend' in fwi:
                                 bdata['version'] = fwi['fw_version_pend']
                             yield '{0} Pending Update'.format(aname), bdata
         for fwi in fwu.get('items', []):
