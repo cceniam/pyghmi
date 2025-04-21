@@ -1429,6 +1429,8 @@ class Command(object):
                 self.wc.stdheaders['X-Auth-Token'] = self.xauthtoken
                 if 'Authorization' in self.wc.stdheaders:
                     del self.wc.stdheaders['Authorization']
+        for res in self.oem.list_media(self, cache=False):
+            pass
 
     def detach_remote_media(self):
         try:
@@ -1462,6 +1464,8 @@ class Command(object):
                                                      method='PATCH')
                             else:
                                 raise
+        for res in self.oem.list_media(self, cache=False):
+            pass
 
     def upload_media(self, filename, progress=None, data=None):
         """Upload a file to be hosted on the target BMC

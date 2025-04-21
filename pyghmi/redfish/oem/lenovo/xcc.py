@@ -1151,7 +1151,7 @@ class OEMHandler(generic.OEMHandler):
         res = wc.grab_json_response_with_status(url, body, method=method)
         return res
 
-    def list_media(self, fishclient):
+    def list_media(self, fishclient, cache=True):
         rt = self.wc.grab_json_response('/api/providers/rp_vm_remote_getdisk')
         if 'items' in rt:
             for mt in rt['items']:
