@@ -62,6 +62,19 @@ class OEMHandler(generic.OEMHandler):
         health = healthlookup.get(health, pygconst.Health.Critical)
         return {'health': health}
 
+    def set_identify(self, on=True, blink=False):
+        if on:
+            state = 'On'
+        elif blink:
+            state = 'Blinking'
+        else:
+            state = 'Off'
+        self._do_web_request('/redfish/v1/Chassis/chassis1', {
+            'Oem': {'Lenovo': {'LED': {'IdentifyLED': {
+                'State': state
+                }}}
+            }}, method='PATCH')
+
     def get_system_configuration(self, hideadvanced=True, fishclient=None):
         return {}
 

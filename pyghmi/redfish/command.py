@@ -846,6 +846,8 @@ class Command(object):
         self._do_web_request(url, {'ResetType': action})
 
     def set_identify(self, on=True, blink=None):
+        if hasattr(self.oem, 'set_identify'):
+            return self.oem.set_identify(on, blink)
         targurl = self.sysurl
         if not targurl:
             root = self._do_web_request('/redfish/v1')
