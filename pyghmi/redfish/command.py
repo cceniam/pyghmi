@@ -522,10 +522,8 @@ class Command(object):
             raise exc.InvalidParameterValue(
                 "Unknown power state %s requested" % powerstate)
         powerstate = powerstates[powerstate]
-        result = self.wc.grab_json_response_with_status(
+        self._do_web_request(
             self.powerurl, {'ResetType': powerstate})
-        if result[1] < 200 or result[1] >= 300:
-            raise exc.PyghmiException(result[0])
         if wait and reqpowerstate in ('on', 'off', 'softoff', 'shutdown'):
             if reqpowerstate in ('softoff', 'shutdown'):
                 reqpowerstate = 'off'
