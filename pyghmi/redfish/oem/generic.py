@@ -193,6 +193,7 @@ class OEMHandler(object):
         self._varsysurl = sysurl
         self._urlcache = cache
         self.webclient = webclient
+        self._hwnamemap = {}
 
     def get_screenshot(self, outfile):
         raise exc.UnsupportedFunctionality(

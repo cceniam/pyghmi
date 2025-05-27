@@ -86,7 +86,7 @@ class OEMHandler(generic.OEMHandler):
     
     def get_inventory(self, withids=False):
         sysinfo = {
-            'UUID': self._varsysinfo.get('UUID', ''),
+            'UUID': self._varsysinfo.get('UUID', '').lower(),
             'Serial Number': self._varsysinfo.get('SerialNumber', ''),
             'Manufacturer': self._varsysinfo.get('Manufacturer', ''),
             'Product name': self._varsysinfo.get('Model', ''),
@@ -165,7 +165,7 @@ class OEMHandler(generic.OEMHandler):
                 if fundata['Members'][0]['DeviceClass'] == 'NetworkController':
                     ports_data = self._get_expanded_data('{0}/Ports'.format(adata['@odata.id'].replace('PCIeDevices','NetworkAdapters')))
                     for port in ports_data['Members']:
-                        bdata['MAC Address {0}'.format(port['Id'])] = port['Ethernet']['AssociatedMACAddresses'][0]
+                        bdata['MAC Address {0}'.format(port['Id'])] = port['Ethernet']['AssociatedMACAddresses'][0].lower()
                 hwmap[aname] = bdata
             self.datacache['lenovo_cached_hwmap'] = (hwmap,
                                                      util._monotonic_time())
@@ -218,41 +218,6 @@ class OEMHandler(generic.OEMHandler):
                 elif mode == 1:
                     yield self.get_disk_hardware(diskent)
 
-    def _get_cpu_inventory(self):
-        procdata = self.get_cached_data('lenovo_cached_proc')
-        if not procdata:
-                procdata = self._get_expanded_data("/redfish/v1/Systems/1/Processors")
-                if procdata:
-                    self.datacache['lenovo_cached_proc'] = (
-                        procdata, util._monotonic_time())
-        if procdata:
-            for proc in procdata.get('Members', []):
-                procinfo = {
-                    'Model': proc['Model']
-                }
-                yield ('{0}'.format(proc['Name']),
-                       procinfo)
-    
-    def _get_mem_inventory(self):
-        memdata = self.get_cached_data('lenovo_cached_memory')
-        if not memdata:
-            if self.webclient:
-                memdata = self._get_expanded_data("/redfish/v1/Systems/1/Memory")
-                if memdata:
-                    self.datacache['lenovo_cached_memory'] = (
-                        memdata, util._monotonic_time())
-        if memdata:
-            for dimm in memdata.get('Members', []):
-                memdata = {}
-                memdata['speed'] = dimm['OperatingSpeedMhz'] * 8 // 100 * 100
-                memdata['module_type'] = 'RDIMM'
-                memdata['capacity_mb'] = dimm['CapacityMiB']
-                memdata['manufacturer'] = dimm['Manufacturer']
-                memdata['memory_type'] = dimm['MemoryDeviceType']
-                memdata['model'] = dimm['PartNumber'].rstrip()
-                memdata['serial'] = dimm['SerialNumber']
-                yield (dimm['Name'], memdata)
-    
     def get_storage_configuration(self, logout=True):
         rsp = self._get_expanded_data("/redfish/v1/Systems/1/Storage")
         standalonedisks = []
